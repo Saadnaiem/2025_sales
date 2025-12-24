@@ -365,6 +365,7 @@ export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?
             classes: [...new Set(data.map(r => r['CLASS']))].filter((x): x is string => !!x).sort(),
             branches: [...new Set(data.map(r => r['BRANCH NAME']))].filter((x): x is string => !!x).sort(),
             brands: [...new Set(data.map(r => r['BRAND']))].filter((x): x is string => !!x).sort(),
+            items: [...new Set(data.map(r => r['ITEM DESCRIPTION']))].filter((x): x is string => !!x).sort(),
         },
     };
 };
