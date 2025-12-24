@@ -357,7 +357,10 @@ export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?
         },
         lostBrandsList: lostBrandsListFull.map(x => ({ name: x.name, sales2024: x.sales2024 })),
         lostItemsList: lostItemsListFull.map(x => ({ name: x.name, sales2024: x.sales2024, code: x.code || '' })),
-        filterOptions: existingFilterOptions || {
+        filterOptions: existingFilterOptions ? {
+            ...existingFilterOptions,
+            items: (existingFilterOptions as any).items || [...new Set(data.map(r => r['ITEM DESCRIPTION']))].filter((x): x is string => !!x).sort(),
+        } : {
             divisions: [...new Set(data.map(r => r['DIVISION']))].filter((x): x is string => !!x).sort(),
             departments: [...new Set(data.map(r => r['DEPARTMENT']))].filter((x): x is string => !!x).sort(),
             categories: [...new Set(data.map(r => r['CATEGORY']))].filter((x): x is string => !!x).sort(),
