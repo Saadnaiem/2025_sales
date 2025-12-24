@@ -19,7 +19,7 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
     // 1. Try fetching local file first (best for production if file exists)
     try {
         onProgress('Checking for local data file...');
-        const localPath = `${import.meta.env.BASE_URL}sales_data.csv`.replace(/\/\//g, '/'); // Ensure double slashes are cleaned
+        const localPath = `${(import.meta as any).env.BASE_URL}sales_data.csv`.replace(/\/\//g, '/'); // Ensure double slashes are cleaned
         const response = await fetch(localPath);
         if (response.ok) {
             const csvText = await response.text();

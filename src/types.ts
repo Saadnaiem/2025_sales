@@ -119,6 +119,7 @@ export interface ProcessedData {
         classes: string[];
         branches: string[];
         brands: string[];
+        items: string[];
     };
 }
 

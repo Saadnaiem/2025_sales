@@ -141,11 +141,11 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
     // Reset dependent filters? For deep dive navigation, we perform a navigate() which resets via useEffect
     // So we don't need aggressive auto-clearing here for the click-path.
 
-    const handleLocalMultiSelectChange = (e: React.ChangeEvent<HTMLSelectElement>, filterKey: keyof typeof localFilters) => {
-        const selectedOptions = Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value);
-        setLocalFilters(prev => ({ ...prev, [filterKey]: selectedOptions }));
-        setShowFilters(false);
-    };
+    // const handleLocalMultiSelectChange = (e: React.ChangeEvent<HTMLSelectElement>, filterKey: keyof typeof localFilters) => {
+    //     const selectedOptions = Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value);
+    //     setLocalFilters(prev => ({ ...prev, [filterKey]: selectedOptions }));
+    //     setShowFilters(false);
+    // };
 
     const resetLocalFilters = () => {
         setLocalFilters({ division: [], department: [], category: [], subcategory: [], class: [], branch: [], brand: [], item: [] });
@@ -579,8 +579,8 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
             labelColSpan = firstNumericIndex;
         }
 
-        const totalContribution2025 = processedData.reduce((acc, item) => acc + ((item as any).contribution2025 || 0), 0);
-        const totalContribution2024 = processedData.reduce((acc, item) => acc + ((item as any).contribution2024 || 0), 0);
+        // const totalContribution2025 = allRawData.reduce((acc, row) => acc + (row['2025 TOTAL SALES'] || 0), 0);
+        // const totalContribution2024 = allRawData.reduce((acc, row) => acc + (row['2024 TOTAL SALES'] || 0), 0);
 
         return (
 
