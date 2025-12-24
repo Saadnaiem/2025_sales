@@ -549,27 +549,91 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
     };
 
     const handleDownloadPDF = () => {
-        const doc = new jsPDF();
-        doc.text(tableTitle, 14, 20);
+        try {
+            const doc = new jsPDF({ orientation: 'landscape' });
 
-        const tableColumn = headers.map(h => h.label);
-        const tableRows: any[][] = processedData.map((item, index) =>
-            headers.map(h => {
-                if (h.key === 'rowNumber') return index + 1;
-                const value = (item as any)[h.key];
-                if (h.key === 'growth') return value === Infinity ? 'New' : typeof value === 'number' ? `${value.toFixed(2)}%` : '-';
-                if (h.key.includes('contribution')) return typeof value === 'number' ? `${value.toFixed(2)}%` : '-';
-                if (typeof value === 'number') return formatNumberAbbreviated(value);
-                return value || '-';
-            })
-        );
+            // Add Title
+            doc.setFontSize(16);
+            doc.text(tableTitle, 14, 15);
+            doc.setFontSize(10);
+            const dateStr = new Date().toLocaleDateString();
+            doc.text(`Generated on: ${dateStr}`, 14, 22);
 
-        (doc as any).autoTable({
-            head: [tableColumn], body: tableRows, startY: 25, theme: 'grid',
-            headStyles: { fillColor: [34, 197, 94] }, // Green-500
-            styles: { font: 'helvetica', fontSize: 8 },
-        });
-        doc.save(`${viewType}_report.pdf`);
+            const tableColumn = headers.map(h => h.label);
+            const tableRows: any[][] = processedData.map((item, index) =>
+                headers.map(h => {
+                    if (h.key === 'rowNumber') return index + 1;
+                    const value = (item as any)[h.key];
+                    if (h.key === 'growth') return value === Infinity ? 'New' : typeof value === 'number' ? `${value.toFixed(2)}%` : '-';
+                    if (h.key.includes('contribution')) return typeof value === 'number' ? `${value.toFixed(2)}%` : '-';
+                    if (typeof value === 'number') return formatNumberAbbreviated(value);
+                    return value || '-';
+                })
+            );
+
+            // Calculate Footer Row
+            const footerRow = headers.map((h, index) => {
+                if (index === 0) return `Totals (${summaryTotals.count})`; // First column (usually #)
+                if (index < headers.findIndex(head => ['sales2025', 'sales2024'].includes(head.key))) return ''; // Empty for non-numeric lead columns
+
+                switch (h.key) {
+                    case 'sales2025': return formatNumberAbbreviated(summaryTotals.total2025);
+                    case 'cash2025': return formatNumberAbbreviated(summaryTotals.totalCash2025);
+                    case 'credit2025': return formatNumberAbbreviated(summaryTotals.totalCredit2025);
+                    case 'cashContribution2025': return summaryTotals.total2025 > 0 ? `${((summaryTotals.totalCash2025 / summaryTotals.total2025) * 100).toFixed(1)}%` : '-';
+
+                    case 'sales2024': return formatNumberAbbreviated(summaryTotals.total2024);
+                    case 'cash2024': return formatNumberAbbreviated(summaryTotals.totalCash2024);
+                    case 'credit2024': return formatNumberAbbreviated(summaryTotals.totalCredit2024);
+                    case 'cashContribution2024': return summaryTotals.total2024 > 0 ? `${((summaryTotals.totalCash2024 / summaryTotals.total2024) * 100).toFixed(1)}%` : '-';
+
+                    case 'growth': return summaryTotals.growth === Infinity ? 'New' : `${summaryTotals.growth.toFixed(2)}%`;
+
+                    case 'cashGrowth':
+                        const cg = ((summaryTotals.totalCash2025 - summaryTotals.totalCash2024) / summaryTotals.totalCash2024) * 100;
+                        return !isFinite(cg) ? (summaryTotals.totalCash2025 > 0 ? 'New' : '-') : `${cg.toFixed(2)}%`;
+                    case 'creditGrowth':
+                        const crg = ((summaryTotals.totalCredit2025 - summaryTotals.totalCredit2024) / summaryTotals.totalCredit2024) * 100;
+                        return !isFinite(crg) ? (summaryTotals.totalCredit2025 > 0 ? 'New' : '-') : `${crg.toFixed(2)}%`;
+
+                    default: return '';
+                }
+            });
+
+            (doc as any).autoTable({
+                head: [tableColumn],
+                body: tableRows,
+                foot: [footerRow],
+                startY: 25,
+                theme: 'grid',
+                headStyles: { fillColor: [34, 197, 94], fontSize: 8, fontStyle: 'bold' },
+                footStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 }, // Slate-700
+                styles: {
+                    font: 'helvetica',
+                    fontSize: 7,
+                    cellPadding: 2,
+                    overflow: 'linebreak',
+                    halign: 'right' // Default right align for numbers
+                },
+                columnStyles: {
+                    0: { halign: 'center' }, // Row number
+                    1: { halign: 'left' }, // Code or Name depending on view
+                    2: { halign: 'left' }  // Name
+                },
+                didParseCell: (data: any) => {
+                    // Align text columns left if not caught by columnStyles
+                    if (data.section === 'body' && typeof data.cell.raw === 'string' && isNaN(Number(data.cell.raw.replace(/,/g, '').replace('%', '')))) {
+                        // Simple heuristic: if it's text, left align. 
+                        // However, our data is formatted, so checking column index is safer.
+                        // Let's rely on columnStyles for safety.
+                    }
+                }
+            });
+            doc.save(`${viewType}_report.pdf`);
+        } catch (error) {
+            console.error("PDF Generation failed:", error);
+            alert("Failed to generate PDF. Please try again or check console for details.");
+        }
     };
 
     const tableFooter = useMemo(() => {

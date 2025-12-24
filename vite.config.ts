@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ command }) => {
   const config = {
     plugins: [react()],
-    base: command === 'serve' ? '/' : '/2025_sales/',
+    base: command === 'serve' ? '/' : '/',
     build: {
       rollupOptions: {
         // Add 'external' to tell Rollup not to bundle these packages.
