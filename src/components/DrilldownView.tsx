@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { RawSalesDataRow, ProcessedData } from '../types';
 import { formatNumberAbbreviated, GrowthIndicator } from '../utils/formatters';
 import useOnClickOutside from '../hooks/useOnClickOutside';
@@ -600,7 +600,7 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
                 }
             });
 
-            (doc as any).autoTable({
+            autoTable(doc, {
                 head: [tableColumn],
                 body: tableRows,
                 foot: [footerRow],
