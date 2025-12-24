@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/2025_sales/',
   build: {
     rollupOptions: {
       // Add 'external' to tell Rollup not to bundle these packages.
