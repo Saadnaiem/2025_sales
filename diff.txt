@@ -1,0 +1,663 @@
+diff --git a/App.tsx b/App.tsx
+deleted file mode 100644
+index 506c667..0000000
+--- a/App.tsx
++++ /dev/null
+@@ -1,4 +0,0 @@
+-
+-// ⚠️ THIS FILE IS DEPRECATED AND UNUSED ⚠️
+-// The active application code is located in the 'src' directory.
+-// Please view/edit: src/App.tsx
+\ No newline at end of file
+diff --git a/_git_sync_temp.bat b/_git_sync_temp.bat
+deleted file mode 100644
+index 1c3901a..0000000
+--- a/_git_sync_temp.bat
++++ /dev/null
+@@ -1,10 +0,0 @@
+-
+-@echo off
+-echo === GIT STATUS ===
+-git status
+-echo === GIT ADD ===
+-git add .
+-echo === GIT COMMIT ===
+-git commit -m "Update from AI Agent"
+-echo === GIT PUSH ===
+-git push
+diff --git a/components/Dashboard.tsx b/components/Dashboard.tsx
+deleted file mode 100644
+index 7c66a1f..0000000
+--- a/components/Dashboard.tsx
++++ /dev/null
+@@ -1,29 +0,0 @@
+-import React from 'react';
+-import { ProcessedData, FilterState } from '../types';
+-import Header from './Header';
+-import FilterControls from './FilterControls';
+-import SummaryCards from './SummaryCards';
+-import Charts from './Charts';
+-
+-interface DashboardProps {
+-    data: ProcessedData;
+-    filters: FilterState;
+-    onFilterChange: (filters: FilterState) => void;
+-}
+-
+-const Dashboard: React.FC<DashboardProps> = ({ data, filters, onFilterChange }) => {
+-    return (
+-        <div className="flex flex-col gap-6">
+-            <Header />
+-            <FilterControls
+-                options={data.filterOptions}
+-                filters={filters}
+-                onFilterChange={onFilterChange}
+-            />
+-            <SummaryCards data={data} />
+-            <Charts data={data} onFilterChange={onFilterChange} />
+-        </div>
+-    );
+-};
+-
+-export default Dashboard;
+\ No newline at end of file
+diff --git a/delete_files.js b/delete_files.js
+deleted file mode 100644
+index 65c5012..0000000
+--- a/delete_files.js
++++ /dev/null
+@@ -1,43 +0,0 @@
+-
+-const fs = require('fs');
+-const path = require('path');
+-
+-const files = [
+-    'App.tsx',
+-    'index.tsx',
+-    'types.ts'
+-];
+-
+-const dirs = [
+-    'components'
+-];
+-
+-const root = 'c:\\Saad\\New Data For Category Management\\IMF\\dashboard025\\Dashboard2025';
+-
+-files.forEach(file => {
+-    const p = path.join(root, file);
+-    if (fs.existsSync(p)) {
+-        try {
+-            fs.unlinkSync(p);
+-            console.log(`Deleted ${file}`);
+-        } catch (e) {
+-            console.error(`Failed to delete ${file}: ${e.message}`);
+-        }
+-    } else {
+-        console.log(`${file} does not exist`);
+-    }
+-});
+-
+-dirs.forEach(dir => {
+-    const p = path.join(root, dir);
+-    if (fs.existsSync(p)) {
+-        try {
+-            fs.rmSync(p, { recursive: true, force: true });
+-            console.log(`Deleted directory ${dir}`);
+-        } catch (e) {
+-            console.error(`Failed to delete directory ${dir}: ${e.message}`);
+-        }
+-    } else {
+-        console.log(`Directory ${dir} does not exist`);
+-    }
+-});
+diff --git a/exclude_list.txt b/exclude_list.txt
+deleted file mode 100644
+index 8c40726..0000000
+--- a/exclude_list.txt
++++ /dev/null
+@@ -1,4 +0,0 @@
+-\node_modules\
+-\.git\
+-\dist\
+-\_restore_point\
+diff --git a/index.tsx b/index.tsx
+deleted file mode 100644
+index 71145ab..0000000
+--- a/index.tsx
++++ /dev/null
+@@ -1,4 +0,0 @@
+-
+-// ⚠️ THIS FILE IS DEPRECATED AND UNUSED ⚠️
+-// The active application code is located in the 'src' directory.
+-// Please view/edit: src/index.tsx
+diff --git a/services/dataProcessor.ts b/services/dataProcessor.ts
+deleted file mode 100644
+index 8a96769..0000000
+--- a/services/dataProcessor.ts
++++ /dev/null
+@@ -1,220 +0,0 @@
+-import { RawSalesDataRow, ProcessedData, ParetoResult } from '../types';
+-
+-export const normalizeRow = (row: Record<string, string>, headers: string[]): RawSalesDataRow => {
+-    const normalized: { [key: string]: any } = {};
+-    const allPossibleHeaders = ['DIVISION', 'DEPARTMENT', 'SALES2024', 'SALES2025', 'BRANCH CODE', 'BRANCH NAME', 'CATEGORY', 'BRAND', 'ITEM CODE', 'ITEM DESCRIPTION'];
+-    
+-    for (const header of allPossibleHeaders) {
+-        const fileHeader = headers.find(h => h.trim().toUpperCase() === header);
+-        let value = fileHeader ? row[fileHeader] : undefined;
+-
+-        if (typeof value === 'string') {
+-            value = value.trim();
+-             if (value === '#N/A' || value === 'N/A' || value === '') {
+-                value = header.startsWith('SALES') ? '0' : '';
+-            }
+-        }
+-        
+-        if (header.startsWith('SALES')) {
+-            const parseSalesValue = (val: any): number => {
+-                if (val === null || val === undefined) return 0;
+-                let str = String(val).trim();
+-                if (str === "" || str.toLowerCase() === 'n/a' || str === '#n/a') return 0;
+-
+-                // Determine if the number is negative from various accounting formats
+-                const isNegative = str.startsWith('-') || str.endsWith('-') || (str.startsWith('(') && str.endsWith(')'));
+-                
+-                // Remove all non-digit characters except for the decimal point
+-                const numericStr = str.replace(/[^0-9.]/g, '');
+-
+-                const num = parseFloat(numericStr);
+-
+-                if (isNaN(num)) {
+-                    return 0;
+-                }
+-
+-                // Apply the sign and ensure we don't create -0
+-                const result = isNegative ? -Math.abs(num) : Math.abs(num);
+-                return result === 0 ? 0 : result;
+-            };
+-            normalized[header] = parseSalesValue(value);
+-        } else {
+-            normalized[header] = (typeof value === 'string' ? value.toUpperCase() : value) || '';
+-        }
+-    }
+-
+-    return normalized as RawSalesDataRow;
+-};
+-
+-const calculatePareto = (salesData: { [key: string]: number }): ParetoResult => {
+-    const sortedData = Object.entries(salesData)
+-        .map(([name, sales]) => ({ name, sales }))
+-        .filter(item => item.sales > 0)
+-        .sort((a, b) => b.sales - a.sales);
+-
+-    const totalContributors = sortedData.length;
+-    if (totalContributors === 0) {
+-        return { topCount: 0, salesPercent: 0, totalSales: 0, totalContributors: 0 };
+-    }
+-
+-    const totalSales = sortedData.reduce((acc, item) => acc + item.sales, 0);
+-    if (totalSales === 0) {
+-        return { topCount: 0, salesPercent: 0, totalSales: 0, totalContributors };
+-    }
+-
+-    const top20PercentCount = Math.max(1, Math.ceil(totalContributors * 0.20));
+-    const count = Math.min(top20PercentCount, totalContributors);
+-    let salesFromTop20Percent = 0;
+-    for (let i = 0; i < count; i++) {
+-        salesFromTop20Percent += sortedData[i].sales;
+-    }
+-
+-    const percentOfSales = (salesFromTop20Percent / totalSales) * 100;
+-
+-    return {
+-        topCount: count,
+-        salesPercent: percentOfSales,
+-        totalSales,
+-        totalContributors
+-    };
+-};
+-
+-export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?: ProcessedData['filterOptions']): ProcessedData => {
+-    if (data.length === 0) {
+-        // This case is handled in App.tsx by createEmptyProcessedData, but as a safeguard:
+-        return null as any; 
+-    }
+-
+-    let totalSales2024 = 0;
+-    let totalSales2025 = 0;
+-    const divisions: { [key: string]: { s24: number, s25: number } } = {};
+-    const brands: { [key: string]: { s24: number, s25: number } } = {};
+-    const branches: { [key: string]: { s24: number, s25: number } } = {};
+-    const items: { [key: string]: { s24: number, s25: number } } = {};
+-    
+-    const distinct = {
+-        branches24: new Set<string>(), branches25: new Set<string>(),
+-        brands24: new Set<string>(), brands25: new Set<string>(),
+-        items24: new Set<string>(), items25: new Set<string>(),
+-    };
+-
+-    data.forEach(row => {
+-        const s24 = row['SALES2024'];
+-        const s25 = row['SALES2025'];
+-        const div = row['DIVISION'];
+-        const brand = row['BRAND'];
+-        const branch = row['BRANCH NAME'];
+-        const item = row['ITEM DESCRIPTION'];
+-
+-        totalSales2024 += s24;
+-        totalSales2025 += s25;
+-
+-        if (div) {
+-            divisions[div] = divisions[div] || { s24: 0, s25: 0 };
+-            divisions[div].s24 += s24;
+-            divisions[div].s25 += s25;
+-        }
+-        if (brand) {
+-            brands[brand] = brands[brand] || { s24: 0, s25: 0 };
+-            brands[brand].s24 += s24;
+-            brands[brand].s25 += s25;
+-            if (s24 > 0) distinct.brands24.add(brand);
+-            if (s25 > 0) distinct.brands25.add(brand);
+-        }
+-        if (branch) {
+-            branches[branch] = branches[branch] || { s24: 0, s25: 0 };
+-            branches[branch].s24 += s24;
+-            branches[branch].s25 += s25;
+-            if (s24 > 0) distinct.branches24.add(branch);
+-            if (s25 > 0) distinct.branches25.add(branch);
+-        }
+-        if (item) {
+-            items[item] = items[item] || { s24: 0, s25: 0 };
+-            items[item].s24 += s24;
+-            items[item].s25 += s25;
+-            if (s24 > 0) distinct.items24.add(item);
+-            if (s25 > 0) distinct.items25.add(item);
+-        }
+-    });
+-
+-    const salesGrowthPercentage = totalSales2024 === 0 ? (totalSales2025 > 0 ? Infinity : 0) : ((totalSales2025 - totalSales2024) / totalSales2024) * 100;
+-
+-    const transform = (obj: { [key: string]: { s24: number, s25: number } }) => 
+-        Object.entries(obj).map(([name, { s24, s25 }]) => ({ name, sales2024: s24, sales2025: s25 }));
+-
+-    const salesByDivision = transform(divisions).sort((a,b) => b.sales2025 - a.sales2025);
+-    const salesByBrand = transform(brands).sort((a,b) => b.sales2025 - a.sales2025);
+-    const salesByItem = transform(items).sort((a,b) => b.sales2025 - a.sales2025);
+-    const salesByBranch = Object.entries(branches).map(([name, { s24, s25 }]) => ({
+-        name, 
+-        sales2024: s24, 
+-        sales2025: s25,
+-        growth: s24 === 0 ? (s25 > 0 ? Infinity : 0) : ((s25-s24)/s24)*100
+-    })).sort((a,b) => b.sales2025 - a.sales2025);
+-
+-    const top10Brands = salesByBrand.slice(0, 10);
+-    const top50Items = salesByItem.slice(0, 50);
+-    const topDivisionEntry = salesByDivision[0];
+-    const topDivision = topDivisionEntry ? {
+-        ...topDivisionEntry,
+-        growth: topDivisionEntry.sales2024 === 0 ? (topDivisionEntry.sales2025 > 0 ? Infinity : 0) : ((topDivisionEntry.sales2025 - topDivisionEntry.sales2024) / topDivisionEntry.sales2024) * 100
+-    } : null;
+-    
+-    // New/Lost entities
+-    const newBranches = { count: 0, sales: 0 };
+-    Object.entries(branches).forEach(([key, {s24, s25}]) => { if(s25 > 0 && s24 === 0) { newBranches.count++; newBranches.sales += s25; }});
+-    
+-    const newBrands = { count: 0, sales: 0 };
+-    const lostBrands = { count: 0, sales2024: 0 };
+-    Object.entries(brands).forEach(([key, {s24, s25}]) => { 
+-      if(s25 > 0 && s24 === 0) { newBrands.count++; newBrands.sales += s25; }
+-      if(s24 > 0 && s25 === 0) { lostBrands.count++; lostBrands.sales2024 += s24; }
+-    });
+-    
+-    const newItems = { count: 0, sales: 0 };
+-    const lostItems = { count: 0, sales2024: 0 };
+-    Object.entries(items).forEach(([key, {s24, s25}]) => { 
+-      if(s25 > 0 && s24 === 0) { newItems.count++; newItems.sales += s25; }
+-      if(s24 > 0 && s25 === 0) { lostItems.count++; lostItems.sales2024 += s24; }
+-    });
+-    
+-    const getSalesData = (obj: {[key: string]: {s24: number, s25: number}}) => 
+-      Object.fromEntries(Object.entries(obj).map(([key, val]) => [key, val.s25]));
+-
+-    return {
+-        totalSales2024,
+-        totalSales2025,
+-        salesGrowthPercentage,
+-        salesByDivision,
+-        salesByBrand,
+-        salesByBranch,
+-        top10Brands,
+-        top50Items,
+-        topDivision,
+-        branchCount2024: distinct.branches24.size,
+-        branchCount2025: distinct.branches25.size,
+-        brandCount2024: distinct.brands24.size,
+-        brandCount2025: distinct.brands25.size,
+-        itemCount2024: distinct.items24.size,
+-        itemCount2025: distinct.items25.size,
+-        pareto: {
+-            branches: calculatePareto(getSalesData(branches)),
+-            brands: calculatePareto(getSalesData(brands)),
+-            items: calculatePareto(getSalesData(items)),
+-        },
+-        newEntities: {
+-            branches: { ...newBranches, percentOfTotal: totalSales2025 > 0 ? (newBranches.sales/totalSales2025)*100 : 0 },
+-            brands: { ...newBrands, percentOfTotal: totalSales2025 > 0 ? (newBrands.sales/totalSales2025)*100 : 0 },
+-            items: { ...newItems, percentOfTotal: totalSales2025 > 0 ? (newItems.sales/totalSales2025)*100 : 0 },
+-        },
+-        lostEntities: {
+-            brands: { ...lostBrands, percentOfTotal: totalSales2024 > 0 ? (lostBrands.sales2024/totalSales2024)*100 : 0 },
+-            items: { ...lostItems, percentOfTotal: totalSales2024 > 0 ? (lostItems.sales2024/totalSales2024)*100 : 0 },
+-        },
+-        filterOptions: existingFilterOptions || {
+-            divisions: [...new Set(data.map(r => r['DIVISION']))].filter(Boolean).sort(),
+-            branches: [...new Set(data.map(r => r['BRANCH NAME']))].filter(Boolean).sort(),
+-            brands: [...new Set(data.map(r => r['BRAND']))].filter(Boolean).sort(),
+-        },
+-    };
+-};
+\ No newline at end of file
+diff --git a/src/components/DrilldownView.tsx b/src/components/DrilldownView.tsx
+index 8d0b0d4..923c024 100644
+--- a/src/components/DrilldownView.tsx
++++ b/src/components/DrilldownView.tsx
+@@ -2,10 +2,14 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
+ import { useParams, useNavigate, useLocation } from 'react-router-dom';
+ import jsPDF from 'jspdf';
+ import autoTable from 'jspdf-autotable';
++import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
+ import { RawSalesDataRow, ProcessedData } from '../types';
+ import { formatNumberAbbreviated, GrowthIndicator } from '../utils/formatters';
+ import useOnClickOutside from '../hooks/useOnClickOutside';
+ 
++// Palette for the chart
++const COLORS = ['#38bdf8', '#818cf8', '#34d399', '#fb7185', '#facc15', '#a78bfa', '#f472b6', '#fb923c'];
++
+ type SortDirection = 'ascending' | 'descending';
+ interface SortConfig { key: string; direction: SortDirection; }
+ 
+@@ -59,6 +63,33 @@ const viewTitles: { [key: string]: string } = {
+ };
+ 
+ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterOptions }) => {
++        // Calculate filtered branch count and sales contributions
++        const filteredBranchCount = availableBranches.length;
++        const totalBranchCount = globalFilterOptions?.branches.length || 0;
++        // Calculate sales contributions for filtered branches
++        const totalSales2025 = globalFilterOptions?.totalSales2025 || 0;
++        const totalSales2024 = globalFilterOptions?.totalSales2024 || 0;
++        const totalCashSales2025 = globalFilterOptions?.totalCashSales2025 || 0;
++        const totalCashSales2024 = globalFilterOptions?.totalCashSales2024 || 0;
++        const totalCreditSales2025 = globalFilterOptions?.totalCreditSales2025 || 0;
++        const totalCreditSales2024 = globalFilterOptions?.totalCreditSales2024 || 0;
++
++        // Filtered branch sales sums
++        const filteredBranchNames = new Set(availableBranches);
++        const filteredBranchSales2025 = allRawData.filter(row => filteredBranchNames.has(row['BRANCH NAME'])).reduce((acc, row) => acc + (row['2025 TOTAL SALES'] || 0), 0);
++        const filteredBranchSales2024 = allRawData.filter(row => filteredBranchNames.has(row['BRANCH NAME'])).reduce((acc, row) => acc + (row['2024 TOTAL SALES'] || 0), 0);
++        const filteredBranchCash2025 = allRawData.filter(row => filteredBranchNames.has(row['BRANCH NAME'])).reduce((acc, row) => acc + (row['2025 CASH SALES'] || 0), 0);
++        const filteredBranchCash2024 = allRawData.filter(row => filteredBranchNames.has(row['BRANCH NAME'])).reduce((acc, row) => acc + (row['2024 CASH SALES'] || 0), 0);
++        const filteredBranchCredit2025 = allRawData.filter(row => filteredBranchNames.has(row['BRANCH NAME'])).reduce((acc, row) => acc + (row['2025 CREDIT SALES'] || 0), 0);
++        const filteredBranchCredit2024 = allRawData.filter(row => filteredBranchNames.has(row['BRANCH NAME'])).reduce((acc, row) => acc + (row['2024 CREDIT SALES'] || 0), 0);
++
++        // Contribution percentages
++        const percentTotal2025 = totalSales2025 > 0 ? (filteredBranchSales2025 / totalSales2025) * 100 : 0;
++        const percentTotal2024 = totalSales2024 > 0 ? (filteredBranchSales2024 / totalSales2024) * 100 : 0;
++        const percentCash2025 = totalCashSales2025 > 0 ? (filteredBranchCash2025 / totalCashSales2025) * 100 : 0;
++        const percentCash2024 = totalCashSales2024 > 0 ? (filteredBranchCash2024 / totalCashSales2024) * 100 : 0;
++        const percentCredit2025 = totalCreditSales2025 > 0 ? (filteredBranchCredit2025 / totalCreditSales2025) * 100 : 0;
++        const percentCredit2024 = totalCreditSales2024 > 0 ? (filteredBranchCredit2024 / totalCreditSales2024) * 100 : 0;
+     const { viewType = '' } = useParams<{ viewType: string }>();
+     const navigate = useNavigate();
+     const location = useLocation();
+@@ -143,7 +174,7 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
+ 
+     // const handleLocalMultiSelectChange = (e: React.ChangeEvent<HTMLSelectElement>, filterKey: keyof typeof localFilters) => {
+     //     const selectedOptions = Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value);
+-    //     setLocalFilters(prev => ({ ...prev, [filterKey]: selectedOptions }));
++    //     setLocalFilters(prev => ({...prev, [filterKey]: selectedOptions }));
+     //     setShowFilters(false);
+     // };
+ 
+@@ -684,6 +715,49 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
+ 
+     }, [headers, processedData, summaryTotals, entityTypeLabel]);
+ 
++    // Calculate chart data for divisions
++    const chartData = useMemo(() => {
++        if (viewType !== 'divisions') return [];
++        return processedData.map(d => ({
++            name: d.name,
++            value: d.sales2025 || 0,
++            sales2024: d.sales2024 || 0,
++            growth: d.growth || 0
++        })).filter(d => d.value > 0);
++    }, [viewType, processedData]);
++
++    const CustomTooltip = ({ active, payload }: any) => {
++        if (active && payload && payload.length) {
++            const data = payload[0].payload;
++            return (
++                <div className="bg-slate-900/90 border border-slate-700 p-3 rounded shadow-xl min-w-[200px]">
++                    <p className="font-bold text-white mb-2 text-lg border-b border-slate-700 pb-1">{data.name}</p>
++                    <div className="space-y-1">
++                        <div className="flex justify-between items-center text-sm">
++                            <span className="text-slate-400">2025 Sales:</span>
++                            <span className="text-green-400 font-bold">{formatNumberAbbreviated(data.value)}</span>
++                        </div>
++                        <div className="flex justify-between items-center text-sm">
++                            <span className="text-slate-400">2024 Sales:</span>
++                            <span className="text-blue-400 font-bold">{formatNumberAbbreviated(data.sales2024)}</span>
++                        </div>
++                        <div className="flex justify-between items-center text-sm mt-2 pt-2 border-t border-slate-700">
++                            <span className="text-slate-400">Growth:</span>
++                            <span className={`font-bold ${data.growth >= 0 ? 'text-green-400' : 'text-rose-400'}`}>
++                                {data.growth === Infinity ? 'New' : `${data.growth > 0 ? '+' : ''}${data.growth.toFixed(1)}%`}
++                            </span>
++                        </div>
++                        <div className="flex justify-between items-center text-xs text-slate-500 mt-1">
++                            <span>Division Contribution:</span>
++                            <span>{(payload[0].percent * 100).toFixed(1)}%</span>
++                        </div>
++                    </div>
++                </div>
++            );
++        }
++        return null;
++    };
++
+     // FIX: Explicitly typed 'val' as string[] to resolve a type inference issue with Object.values.
+     const activeFilterCount = Object.values(localFilters).reduce((acc, val: string[]) => acc + val.length, 0);
+     const totalActiveIndicators = activeFilterCount + (searchTerm ? 1 : 0);
+@@ -750,6 +824,36 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
+                     </div>
+                 </div>
+             </div>
++
++            {/* Chart Section for Divisions */}
++            {viewType === 'divisions' && chartData.length > 0 && (
++                <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 shadow-xl">
++                    <h3 className="text-xl font-bold text-white mb-6 text-center">Sales Distribution by Division (2025)</h3>
++                    <div className="h-[400px] w-full">
++                        <ResponsiveContainer width="100%" height="100%">
++                            <PieChart>
++                                <Pie
++                                    data={chartData}
++                                    cx="50%"
++                                    cy="50%"
++                                    labelLine={false}
++                                    outerRadius={150}
++                                    fill="#8884d8"
++                                    dataKey="value"
++                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
++                                >
++                                    {chartData.map((entry, index) => (
++                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
++                                    ))}
++                                </Pie>
++                                <Tooltip content={<CustomTooltip />} />
++                                <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: '20px' }} />
++                            </PieChart>
++                        </ResponsiveContainer>
++                    </div>
++                </div>
++            )}
++
+             <div ref={filterContainerRef} className="p-6 bg-slate-800/50 rounded-2xl shadow-lg border border-slate-700">
+                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                     <div className="relative w-full md:max-w-md">
+diff --git a/src/components/SummaryCards.tsx b/src/components/SummaryCards.tsx
+index 4f28af5..37008ec 100644
+--- a/src/components/SummaryCards.tsx
++++ b/src/components/SummaryCards.tsx
+@@ -15,69 +15,80 @@ const SummaryCard: React.FC<{ title: string; icon: string; children: React.React
+                 <div className="text-base font-bold text-slate-300 uppercase tracking-wider">{title}</div>
+             </div>
+             <div className="flex-1 flex flex-col justify-center text-left text-base font-medium text-slate-300">
+-                {children}
+-            </div>
+-        </div>
+-    );
+-
+-    return to ? <Link to={to} className="focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-2xl">{cardContent}</Link> : cardContent;
+-};
+-
+-const MetricCard: React.FC<{ title: string; icon: string; value2025: number; value2024: number; to: string; }> = ({ title, icon, value2025, value2024, to }) => (
+-    <SummaryCard title={title} icon={icon} to={to}>
+-        <div className="text-3xl font-extrabold text-green-400">{formatNumber(value2025, 0)}</div>
+-        <div className="text-base font-bold text-slate-400">2024: {formatNumber(value2024, 0)}</div>
+-        <GrowthIndicator value={value2025 - value2024} unit="" className="text-xl" />
+-    </SummaryCard>
+-);
+-
+-const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+-    <h3 className="text-lg font-semibold text-slate-400 tracking-wider mb-4 border-b-2 border-slate-700 pb-2">{children}</h3>
+-);
+-
+-interface SummaryCardsProps {
+-    data: ProcessedData;
+-    saleType: 'ALL' | 'CASH' | 'CREDIT';
+-}
+-
+-const SummaryCards: React.FC<SummaryCardsProps> = ({ data, saleType }) => {
+-    // If filtering by specific type, we only show one main card for 2025 and one for 2024
+-    // If 'ALL', we show the full breakdown.
+-
+-    const isFiltered = saleType !== 'ALL';
+-
+-    return (
+-        <div className="flex flex-col gap-8">
+-            <section>
+-                <SectionTitle>{isFiltered ? `${saleType === 'CASH' ? 'Cash' : 'Credit'} Sales Overview` : 'Key Metrics Breakdown'}</SectionTitle>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+-                    {/* 2025 Metrics */}
+-                    <SummaryCard title="Total Sales 2025" icon="💰">
+-                        <div className="text-3xl font-extrabold text-green-400">{formatNumberAbbreviated(data.totalSales2025)}</div>
+-                        <GrowthIndicator value={data.salesGrowthPercentage} className="text-xl" />
++                    {/* Filtered Branches Card */}
++                    <SummaryCard title="Branches" icon="🏬">
++                        <div className="text-3xl font-extrabold text-green-400">
++                            {filteredBranchCount ?? data.branchCount2025} / {totalBranchCount ?? data.branchCount2025}
++                        </div>
++                        <div className="text-base font-bold text-slate-400">Filtered / Total</div>
+                     </SummaryCard>
+-
+-                    {(saleType === 'ALL' || saleType === 'CASH') && (
+-                        <SummaryCard title="Cash Sales 2025" icon="💵">
+-                            <div className="text-3xl font-extrabold text-sky-400">{formatNumberAbbreviated(data.totalCashSales2025)}</div>
+-                            {/* If filtered by cash, showing % of total (which is itself) is 100%, maybe redundant, but keeping consistent */}
+-                            <div className="text-sm text-slate-400">{data.totalSales2025 > 0 ? ((data.totalCashSales2025 / data.totalSales2025) * 100).toFixed(1) : 0}% of Total</div>
+-                        </SummaryCard>
+-                    )}
+-
+-                    {(saleType === 'ALL' || saleType === 'CREDIT') && (
+-                        <SummaryCard title="Credit Sales 2025" icon="💳">
+-                            <div className="text-3xl font-extrabold text-indigo-400">{formatNumberAbbreviated(data.totalCreditSales2025)}</div>
+-                            <div className="text-sm text-slate-400">{data.totalSales2025 > 0 ? ((data.totalCreditSales2025 / data.totalSales2025) * 100).toFixed(1) : 0}% of Total</div>
+-                        </SummaryCard>
+-                    )}
+-
+-                    {/* 2024 Metrics */}
+-                    <SummaryCard title="Total Sales 2024" icon="💰">
+-                        <div className="text-3xl font-extrabold text-slate-400">{formatNumberAbbreviated(data.totalSales2024)}</div>
++                    {/* % Sales of Filtered Branches Card */}
++                    <SummaryCard title="% Sales (Filtered Branches)" icon="📊">
++                        <div className="text-lg text-slate-300">2025: <span className="font-extrabold text-green-400">{(percentTotal2025 ?? 0).toFixed(1)}%</span></div>
++                        <div className="text-lg text-slate-300">2024: <span className="font-extrabold text-slate-400">{(percentTotal2024 ?? 0).toFixed(1)}%</span></div>
++                    </SummaryCard>
++                    {/* Total Sales Card */}
++                    <SummaryCard title="Total Sales" icon="💰">
++                        <div className="text-lg text-slate-300">2025: <span className="font-extrabold text-green-400">{formatNumberAbbreviated(data.totalSales2025)}</span> <span className="text-xs">({(percentTotal2025 ?? 0).toFixed(1)}%)</span></div>
++                        <div className="text-lg text-slate-300">2024: <span className="font-extrabold text-slate-400">{formatNumberAbbreviated(data.totalSales2024)}</span> <span className="text-xs">({(percentTotal2024 ?? 0).toFixed(1)}%)</span></div>
++                    </SummaryCard>
++                    {/* Cash Sales Card */}
++                    <SummaryCard title="Cash Sales" icon="💵">
++                        <div className="text-lg text-sky-300">2025: <span className="font-extrabold text-sky-400">{formatNumberAbbreviated(data.totalCashSales2025)}</span> <span className="text-xs">({(percentCash2025 ?? 0).toFixed(1)}%)</span></div>
++                        <div className="text-lg text-sky-300">2024: <span className="font-extrabold text-sky-200">{formatNumberAbbreviated(data.totalCashSales2024)}</span> <span className="text-xs">({(percentCash2024 ?? 0).toFixed(1)}%)</span></div>
++                    </SummaryCard>
++                    {/* Credit Sales Card */}
++                    <SummaryCard title="Credit Sales" icon="💳">
++                        <div className="text-lg text-orange-300">2025: <span className="font-extrabold text-orange-400">{formatNumberAbbreviated(data.totalCreditSales2025)}</span> <span className="text-xs">({(percentCredit2025 ?? 0).toFixed(1)}%)</span></div>
++                        <div className="text-lg text-orange-300">2024: <span className="font-extrabold text-orange-200">{formatNumberAbbreviated(data.totalCreditSales2024)}</span> <span className="text-xs">({(percentCredit2024 ?? 0).toFixed(1)}%)</span></div>
++                    </SummaryCard>
++                    {/* Top Division and Metrics */}
++                    <SummaryCard title="Top Division" icon="🏆" to="/details/divisions">
++                        {data.topDivision ? (
++                            <>
++                                <div className="text-xl font-bold text-sky-400 truncate" title={data.topDivision.name}>{data.topDivision.name}</div>
++                                <div className="text-sm text-slate-400">2025 Sales: {formatNumberAbbreviated(data.topDivision.sales2025)}</div>
++                                <GrowthIndicator value={data.topDivision.growth} className="text-xl" />
++                            </>
++                        ) : <div className="text-xl font-bold text-slate-400">-</div>}
++                    </SummaryCard>
++                    <MetricCard title="Branches" icon="🏬" value2025={data.branchCount2025} value2024={data.branchCount2024} to="/details/branches" />
++                    <MetricCard title="Brands" icon="🏷️" value2025={data.brandCount2025} value2024={data.brandCount2024} to="/details/brands" />
++                    <MetricCard title="Items" icon="📦" value2025={data.itemCount2025} value2024={data.itemCount2024} to="/details/items" />
++                </div>
++            </section>
++            <section>
++                <SectionTitle>Pareto Analysis (80/20 Rule)</SectionTitle>
++                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
++                    <SummaryCard title="Top 20% Branches" icon="📊" to="/details/pareto_branches">
++            const SummaryCard: React.FC<{ title: string; icon: string; children: React.ReactNode; to?: string; }> = ({ title, icon, children, to }) => {
++                            Top <b>{formatNumber(data.pareto.branches.topCount)}</b> of <b>{formatNumber(data.pareto.branches.totalContributors)}</b> branches generate:
++                        </p>
++                        <div className="flex items-baseline justify-start gap-4 mt-2">
++                            <div className="text-green-400 font-extrabold text-3xl" title={`Exact: ${data.pareto.branches.salesPercent.toFixed(4)}%`}>
++                                {data.pareto.branches.salesPercent.toFixed(1)}%
++                            </div>
++                            <div className="text-sky-400 font-bold text-xl">
++                                {formatNumberAbbreviated(data.pareto.branches.topSales)}
++                            </div>
++                        </div>
++                        <p className="text-xs text-slate-400 mt-1">of total 2025 sales</p>
+                     </SummaryCard>
++                    {/* ...existing code... */}
++                </div>
++            </section>
++        </div>
+ 
+-                    {(saleType === 'ALL' || saleType === 'CASH') && (
++                    {/* Credit Sales Card */}
++            // Main dashboard cards rendering
++                    <SummaryCard title="Credit Sales" icon="💳">
++                        <div className="text-lg text-orange-300">2025: <span className="font-extrabold text-orange-400">{formatNumberAbbreviated(data.totalCreditSales2025)}</span> <span className="text-xs">({(percentCredit2025 ?? 0).toFixed(1)}%)</span></div>
++                        <div className="text-lg text-orange-300">2024: <span className="font-extrabold text-orange-200">{formatNumberAbbreviated(data.totalCreditSales2024)}</span> <span className="text-xs">({(percentCredit2024 ?? 0).toFixed(1)}%)</span></div>
++                    </SummaryCard>
++                </div>
++                </>
++            </section>
+                         <SummaryCard title="Cash Sales 2024" icon="💵">
+                             <div className="text-3xl font-extrabold text-slate-400">{formatNumberAbbreviated(data.totalCashSales2024)}</div>
+                             <div className="text-sm text-slate-500">{data.totalSales2024 > 0 ? ((data.totalCashSales2024 / data.totalSales2024) * 100).toFixed(1) : 0}% of Total</div>
+diff --git a/types.ts b/types.ts
+deleted file mode 100644
+index abb24a6..0000000
+--- a/types.ts
++++ /dev/null
+@@ -1,4 +0,0 @@
+-
+-// ⚠️ THIS FILE IS DEPRECATED AND UNUSED ⚠️
+-// The active application code is located in the 'src' directory.
+-// Please view/edit: src/types.ts
+\ No newline at end of file

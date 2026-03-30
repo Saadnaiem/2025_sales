@@ -8,9 +8,6 @@ export default defineConfig(({ command }) => {
     base: command === 'serve' ? '/' : '/',
     build: {
       rollupOptions: {
-        // Add 'external' to tell Rollup not to bundle these packages.
-        // They are provided at runtime by the importmap in index.html.
-        external: ['jspdf', 'jspdf-autotable'],
         output: {
           manualChunks(id: string) {
             // Group large vendor libraries into a separate chunk to improve performance
