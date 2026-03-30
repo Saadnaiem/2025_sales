@@ -63,7 +63,7 @@ const Charts: React.FC<ChartsProps> = ({ data, filters, onFilterChange }) => {
         return <span className="text-slate-200">{value}</span>;
     };
 
-    const CustomTooltip = ({ active, payload, label }: any) => {
+    const CustomTooltip = ({ active, payload, label, showContribution }: any) => {
         if (active && payload && payload.length) {
             const finalLabel = label || payload[0].name;
             const itemPayload = payload[0].payload;
@@ -78,10 +78,12 @@ const Charts: React.FC<ChartsProps> = ({ data, filters, onFilterChange }) => {
                             <div style={{ color: COLORS.blue }}>2024 Sales: {formatNumber(itemPayload.sales2024)}</div>
                             {itemPayload.cashSales2024 !== undefined && (type === 'ALL' || type === 'CASH') && <div className="text-xs text-slate-400 pl-2">Cash: {formatNumber(itemPayload.cashSales2024)}</div>}
                             {itemPayload.creditSales2024 !== undefined && (type === 'ALL' || type === 'CREDIT') && <div className="text-xs text-slate-400 pl-2">Credit: {formatNumber(itemPayload.creditSales2024)}</div>}
+                            {showContribution && data.totalSales2024 > 0 && <div className="text-xs text-blue-300 pl-2 mt-1 font-semibold">Contribution: {((itemPayload.sales2024 / data.totalSales2024) * 100).toFixed(1)}%</div>}
 
-                            <div style={{ color: COLORS.teal }}>2025 Sales: {formatNumber(itemPayload.sales2025)}</div>
+                            <div style={{ color: COLORS.teal }} className="mt-2">2025 Sales: {formatNumber(itemPayload.sales2025)}</div>
                             {itemPayload.cashSales2025 !== undefined && (type === 'ALL' || type === 'CASH') && <div className="text-xs text-slate-400 pl-2">Cash: {formatNumber(itemPayload.cashSales2025)}</div>}
                             {itemPayload.creditSales2025 !== undefined && (type === 'ALL' || type === 'CREDIT') && <div className="text-xs text-slate-400 pl-2">Credit: {formatNumber(itemPayload.creditSales2025)}</div>}
+                            {showContribution && data.totalSales2025 > 0 && <div className="text-xs text-teal-300 pl-2 mt-1 font-semibold">Contribution: {((itemPayload.sales2025 / data.totalSales2025) * 100).toFixed(1)}%</div>}
 
                             {itemPayload.growth !== undefined && (
                                 <div className={itemPayload.growth >= 0 ? 'text-green-400' : 'text-red-400'}>
@@ -253,7 +255,7 @@ const Charts: React.FC<ChartsProps> = ({ data, filters, onFilterChange }) => {
             ) {
                 onFilterChange({ ...filters, divisions: [], branches: [], brands: [], items: [] });
             } else {
-                onFilterChange({ ...filters, divisions: [], branches: [], brands: [], items: [], [filterKey]: [value] });
+                onFilterChange({ ...filters, divisions: [], branches: [], brands: [], items: [], types: [], typePluses: [], [filterKey]: [value] });
             }
         }
     }, [onFilterChange, filters]);
@@ -265,9 +267,9 @@ const Charts: React.FC<ChartsProps> = ({ data, filters, onFilterChange }) => {
             const currentFilterValues = filters.divisions;
 
             if (Array.isArray(currentFilterValues) && currentFilterValues.length === 1 && currentFilterValues[0] === divisionName) {
-                onFilterChange({ ...filters, divisions: [], branches: [], brands: [], items: [] });
+                onFilterChange({ ...filters, divisions: [], branches: [], brands: [], items: [], types: [], typePluses: [] });
             } else {
-                onFilterChange({ ...filters, divisions: [divisionName], branches: [], brands: [], items: [] });
+                onFilterChange({ ...filters, divisions: [divisionName], branches: [], brands: [], items: [], types: [], typePluses: [] });
             }
         }
     }, [activeIndex, data.salesByDivision, onFilterChange, filters]);
@@ -301,9 +303,21 @@ const Charts: React.FC<ChartsProps> = ({ data, filters, onFilterChange }) => {
             .sort((a, b) => b.sales2025 - a.sales2025),
         [data.top50Items]);
 
+    const storeTypesSorted = useMemo(() =>
+        [...data.salesByType]
+            .sort((a, b) => b.sales2025 - a.sales2025),
+        [data.salesByType]);
+
+    const storeTypePlusesSorted = useMemo(() =>
+        [...data.salesByTypePlus]
+            .sort((a, b) => b.sales2025 - a.sales2025),
+        [data.salesByTypePlus]);
+
     const barHeight = isMobile ? 22 : 25;
     const allBranchesChartHeight = Math.max(400, allBranchesSorted.length * barHeight);
     const top50ItemsChartHeight = Math.max(400, top50ItemsSorted.length * barHeight);
+    const storeTypesChartHeight = Math.max(400, storeTypesSorted.length * barHeight);
+    const storeTypePlusesChartHeight = Math.max(400, storeTypePlusesSorted.length * barHeight);
 
     const divisionPieProps: any = {
         activeIndex,
@@ -368,7 +382,7 @@ const Charts: React.FC<ChartsProps> = ({ data, filters, onFilterChange }) => {
                                 <Cell key={`cell-${index}`} fill={DIVISION_CHART_PALETTE[index % DIVISION_CHART_PALETTE.length]} />
                             ))}
                         </Pie>
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip showContribution={true} />} />
                     </PieChart>
                 </ResponsiveContainer>
             </ChartCard>
@@ -442,6 +456,56 @@ const Charts: React.FC<ChartsProps> = ({ data, filters, onFilterChange }) => {
                         <Legend payload={legendPayload} formatter={renderLegendText} />
                         <Bar dataKey="sales2024" name="2024" fill={COLORS.blue} onClick={(payload) => handleBarClick('branches', payload)} />
                         <Bar dataKey="sales2025" name="2025" fill={COLORS.green} onClick={(payload) => handleBarClick('branches', payload)}>
+                            {!isMobile && <LabelList dataKey="growth" content={renderGrowthLabel} />}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="Store Type Comparison" className="lg:col-span-2">
+                <ResponsiveContainer width="100%" height={storeTypesChartHeight}>
+                    <BarChart
+                        layout="vertical"
+                        data={storeTypesSorted}
+                        margin={isMobile
+                            ? { top: 20, right: 80, bottom: 20, left: 100 }
+                            : { left: 150, top: 20, right: 80, bottom: 20 }
+                        }
+                        className="cursor-pointer"
+                        barCategoryGap="20%"
+                    >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis type="number" stroke="white" tickFormatter={formatNumber} tick={{ fill: 'white', fontWeight: 'bold' }} />
+                        <YAxis type="category" dataKey="name" stroke="white" width={isMobile ? 100 : 150} tick={<CustomYAxisTick maxChars={isMobile ? 15 : 20} />} interval={0} />
+                        <Tooltip content={<CustomTooltip showContribution={true} />} />
+                        <Legend payload={legendPayload} formatter={renderLegendText} />
+                        <Bar dataKey="sales2024" name="2024" fill={COLORS.blue} onClick={(payload) => handleBarClick('types', payload)} />
+                        <Bar dataKey="sales2025" name="2025" fill={COLORS.green} onClick={(payload) => handleBarClick('types', payload)}>
+                            {!isMobile && <LabelList dataKey="growth" content={renderGrowthLabel} />}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="Store Type Plus Comparison" className="lg:col-span-2">
+                <ResponsiveContainer width="100%" height={storeTypePlusesChartHeight}>
+                    <BarChart
+                        layout="vertical"
+                        data={storeTypePlusesSorted}
+                        margin={isMobile
+                            ? { top: 20, right: 80, bottom: 20, left: 100 }
+                            : { left: 150, top: 20, right: 80, bottom: 20 }
+                        }
+                        className="cursor-pointer"
+                        barCategoryGap="20%"
+                    >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                        <XAxis type="number" stroke="white" tickFormatter={formatNumber} tick={{ fill: 'white', fontWeight: 'bold' }} />
+                        <YAxis type="category" dataKey="name" stroke="white" width={isMobile ? 100 : 150} tick={<CustomYAxisTick maxChars={isMobile ? 15 : 20} />} interval={0} />
+                        <Tooltip content={<CustomTooltip showContribution={true} />} />
+                        <Legend payload={legendPayload} formatter={renderLegendText} />
+                        <Bar dataKey="sales2024" name="2024" fill={COLORS.blue} onClick={(payload) => handleBarClick('typePluses', payload)} />
+                        <Bar dataKey="sales2025" name="2025" fill={COLORS.green} onClick={(payload) => handleBarClick('typePluses', payload)}>
                             {!isMobile && <LabelList dataKey="growth" content={renderGrowthLabel} />}
                         </Bar>
                     </BarChart>

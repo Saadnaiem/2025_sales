@@ -13,13 +13,14 @@ interface DashboardProps {
     onLogout: () => void;
     searchTerm: string;
     onSearchChange: (term: string) => void;
+    globalData: ProcessedData;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ data, filters, onFilterChange, onLogout, searchTerm, onSearchChange }) => {
+const Dashboard: React.FC<DashboardProps> = ({ data, filters, onFilterChange, onLogout, searchTerm, onSearchChange, globalData }) => {
     const handleReset = () => {
         onFilterChange({
             divisions: [], departments: [], categories: [], subcategories: [], classes: [],
-            branches: [], brands: [], items: [], saleType: 'ALL'
+            branches: [], brands: [], items: [], types: [], typePluses: [], saleType: 'ALL'
         });
         onSearchChange('');
     };
@@ -35,7 +36,18 @@ const Dashboard: React.FC<DashboardProps> = ({ data, filters, onFilterChange, on
                 onSearchChange={onSearchChange}
                 onReset={handleReset}
             />
-            <SummaryCards data={data} saleType={filters.saleType || 'ALL'} />
+            <SummaryCards 
+                data={data} 
+                saleType={filters.saleType || 'ALL'} 
+                filteredBranchCount={data.branchCount2025}
+                totalBranchCount={globalData.branchCount2025}
+                percentTotal2025={globalData.totalSales2025 ? (data.totalSales2025 / globalData.totalSales2025) * 100 : 0}
+                percentTotal2024={globalData.totalSales2024 ? (data.totalSales2024 / globalData.totalSales2024) * 100 : 0}
+                percentCash2025={globalData.totalCashSales2025 ? (data.totalCashSales2025 / globalData.totalCashSales2025) * 100 : 0}
+                percentCash2024={globalData.totalCashSales2024 ? (data.totalCashSales2024 / globalData.totalCashSales2024) * 100 : 0}
+                percentCredit2025={globalData.totalCreditSales2025 ? (data.totalCreditSales2025 / globalData.totalCreditSales2025) * 100 : 0}
+                percentCredit2024={globalData.totalCreditSales2024 ? (data.totalCreditSales2024 / globalData.totalCreditSales2024) * 100 : 0}
+            />
             <Charts data={data} filters={filters} onFilterChange={onFilterChange} />
 
             <div className="mt-8 flex justify-center">

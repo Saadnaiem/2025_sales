@@ -2,9 +2,13 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { RawSalesDataRow, ProcessedData } from '../types';
 import { formatNumberAbbreviated, GrowthIndicator } from '../utils/formatters';
 import useOnClickOutside from '../hooks/useOnClickOutside';
+
+// Palette for the chart
+const COLORS = ['#38bdf8', '#818cf8', '#34d399', '#fb7185', '#facc15', '#a78bfa', '#f472b6', '#fb923c'];
 
 type SortDirection = 'ascending' | 'descending';
 interface SortConfig { key: string; direction: SortDirection; }
@@ -38,6 +42,7 @@ const getMetric = (row: RawSalesDataRow, year: '2024' | '2025', type: 'TOTAL' | 
 export interface DrilldownViewProps {
     allRawData: RawSalesDataRow[];
     globalFilterOptions?: ProcessedData['filterOptions'];
+    globalData?: ProcessedData;
 }
 
 const viewTitles: { [key: string]: string } = {
@@ -49,6 +54,8 @@ const viewTitles: { [key: string]: string } = {
     'branches': 'All Branches Deep Dive',
     'brands': 'All Brands Deep Dive',
     'items': 'All Items Deep Dive',
+    'types': 'Store Type Comparison Deep Dive',
+    'typePluses': 'Store Type Plus Comparison Deep Dive',
     'pareto_branches': 'Pareto: Top 20% Branches',
     'pareto_brands': 'Pareto: Top 20% Brands',
     'pareto_items': 'Pareto: Top 20% Items',
@@ -58,7 +65,8 @@ const viewTitles: { [key: string]: string } = {
     'lost_items': 'Lost Items from 2024',
 };
 
-const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterOptions }) => {
+const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterOptions, globalData }) => {
+
     const { viewType = '' } = useParams<{ viewType: string }>();
     const navigate = useNavigate();
     const location = useLocation();
@@ -78,9 +86,11 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
         branch: [] as string[],
         brand: [] as string[],
         item: [] as string[],
+        type: [] as string[],
+        typePlus: [] as string[],
     });
     const [filterSearch, setFilterSearch] = useState({
-        division: '', branch: '', brand: '', item: ''
+        division: '', branch: '', brand: '', item: '', type: '', typePlus: ''
     });
     const [saleType, setSaleType] = useState<'ALL' | 'CASH' | 'CREDIT'>('ALL');
 
@@ -143,14 +153,14 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
 
     // const handleLocalMultiSelectChange = (e: React.ChangeEvent<HTMLSelectElement>, filterKey: keyof typeof localFilters) => {
     //     const selectedOptions = Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value);
-    //     setLocalFilters(prev => ({ ...prev, [filterKey]: selectedOptions }));
+    //     setLocalFilters(prev => ({...prev, [filterKey]: selectedOptions }));
     //     setShowFilters(false);
     // };
 
     const resetLocalFilters = () => {
-        setLocalFilters({ division: [], department: [], category: [], subcategory: [], class: [], branch: [], brand: [], item: [] });
+        setLocalFilters({ division: [], department: [], category: [], subcategory: [], class: [], branch: [], brand: [], item: [], type: [], typePlus: [] });
         setSearchTerm('');
-        setFilterSearch({ division: '', branch: '', brand: '', item: '' });
+        setFilterSearch({ division: '', branch: '', brand: '', item: '', type: '', typePlus: '' });
         setShowFilters(false);
         navigate(location.pathname);
     };
@@ -206,7 +216,9 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
                 (localFilters.class.length === 0 || localFilters.class.includes(row['CLASS'] || '')) &&
                 (localFilters.branch.length === 0 || localFilters.branch.includes(row['BRANCH NAME'])) &&
                 (localFilters.brand.length === 0 || localFilters.brand.includes(row['BRAND'])) &&
-                (localFilters.item.length === 0 || localFilters.item.includes(row['ITEM DESCRIPTION']));
+                (localFilters.item.length === 0 || localFilters.item.includes(row['ITEM DESCRIPTION'])) &&
+                (localFilters.type.length === 0 || localFilters.type.includes(row['TYPE'] || '')) &&
+                (localFilters.typePlus.length === 0 || localFilters.typePlus.includes(row['TYPE Plus'] || ''));
         });
 
         let displayData: DrilldownItem[] = [];
@@ -221,7 +233,7 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
             localTotal25 += t25;
         });
 
-        const reprocessLocally = (entityKey: 'BRANCH NAME' | 'BRAND' | 'ITEM DESCRIPTION' | 'DIVISION' | 'DEPARTMENT' | 'CATEGORY' | 'SUBCATEGORY' | 'CLASS') => {
+        const reprocessLocally = (entityKey: 'BRANCH NAME' | 'BRAND' | 'ITEM DESCRIPTION' | 'DIVISION' | 'DEPARTMENT' | 'CATEGORY' | 'SUBCATEGORY' | 'CLASS' | 'TYPE' | 'TYPE Plus') => {
             const sales: { [key: string]: { s24: number, s25: number, c25: number, cr25: number, c24: number, cr24: number, code?: string } } = {};
             locallyFilteredRawData.forEach(row => {
                 const key = row[entityKey];
@@ -290,6 +302,8 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
         else if (viewType.includes('subcategor')) entityTypeLabel = "Subcategories";
         else if (viewType.includes('categor')) entityTypeLabel = "Categories";
         else if (viewType.includes('class')) entityTypeLabel = "Classes";
+        else if (viewType.includes('typePluses')) entityTypeLabel = "Store Type Pluses";
+        else if (viewType.includes('type')) entityTypeLabel = "Store Types";
 
         switch (viewType) {
             case 'divisions': displayData = reprocessLocally('DIVISION'); break;
@@ -297,6 +311,8 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
             case 'categories': displayData = reprocessLocally('CATEGORY'); break;
             case 'subcategories': displayData = reprocessLocally('SUBCATEGORY'); break;
             case 'classes': displayData = reprocessLocally('CLASS'); break;
+            case 'types': displayData = reprocessLocally('TYPE'); break;
+            case 'typePluses': displayData = reprocessLocally('TYPE Plus'); break;
 
             case 'branches': {
                 const aggregated = reprocessLocally('BRANCH NAME');
@@ -403,7 +419,9 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
         const visibleFilters = {
             division: false, // Hidden for deep dive, handled by clicks
             branch: true,
-            brand: true
+            brand: true,
+            type: true,
+            typePlus: true
         };
 
         let performanceRateStats: { rate: number; sold: number; total: number } | null = null;
@@ -684,6 +702,70 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
 
     }, [headers, processedData, summaryTotals, entityTypeLabel]);
 
+    // Calculate chart data for divisions
+    const chartData = useMemo(() => {
+        if (viewType !== 'divisions') return [];
+        return processedData.map(d => {
+            let val25 = d.sales2025 || 0;
+            let val24 = d.sales2024 || 0;
+            let grw = d.growth || 0;
+            let tot25 = summaryTotals.total2025;
+            
+            if (saleType === 'CASH') {
+                val25 = d.cash2025 || 0;
+                val24 = d.cash2024 || 0;
+                grw = d.cashGrowth || 0;
+                tot25 = summaryTotals.totalCash2025;
+            } else if (saleType === 'CREDIT') {
+                val25 = d.credit2025 || 0;
+                val24 = d.credit2024 || 0;
+                grw = d.creditGrowth || 0;
+                tot25 = summaryTotals.totalCredit2025;
+            }
+
+            return {
+                name: d.name,
+                value: val25,
+                sales2024: val24,
+                growth: grw,
+                totalForContribution: tot25
+            };
+        }).filter(d => d.value > 0);
+    }, [viewType, processedData, saleType, summaryTotals]);
+
+    const CustomTooltip = ({ active, payload }: any) => {
+        if (active && payload && payload.length) {
+            const data = payload[0].payload;
+            const prefix = saleType === 'CASH' ? 'Cash ' : saleType === 'CREDIT' ? 'Credit ' : '';
+            return (
+                <div className="bg-slate-900/90 border border-slate-700 p-3 rounded shadow-xl min-w-[200px]">
+                    <p className="font-bold text-white mb-2 text-lg border-b border-slate-700 pb-1">{data.name}</p>
+                    <div className="space-y-1">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-400">2025 {prefix}Sales:</span>
+                            <span className="text-green-400 font-bold">{formatNumberAbbreviated(data.value)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-400">2024 {prefix}Sales:</span>
+                            <span className="text-blue-400 font-bold">{formatNumberAbbreviated(data.sales2024)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm mt-2 pt-2 border-t border-slate-700">
+                            <span className="text-slate-400">Growth:</span>
+                            <span className={`font-bold ${data.growth >= 0 ? 'text-green-400' : 'text-rose-400'}`}>
+                                {data.growth === Infinity ? 'New' : `${data.growth > 0 ? '+' : ''}${data.growth.toFixed(1)}%`}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm font-semibold text-teal-300 mt-1">
+                            <span>Division Contribution:</span>
+                            <span>{data.totalForContribution > 0 ? ((data.value / data.totalForContribution) * 100).toFixed(1) : 0}%</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
     // FIX: Explicitly typed 'val' as string[] to resolve a type inference issue with Object.values.
     const activeFilterCount = Object.values(localFilters).reduce((acc, val: string[]) => acc + val.length, 0);
     const totalActiveIndicators = activeFilterCount + (searchTerm ? 1 : 0);
@@ -724,10 +806,15 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
             <div className="p-6 bg-slate-800/50 rounded-2xl shadow-lg border border-slate-700">
                 <h2 className="text-xl font-bold text-white mb-2">Table Insights</h2>
                 <p className="text-slate-300 mb-4">{summaryDescription}</p>
-                <div className={`grid grid-cols-2 ${performanceRateStats !== null ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 text-center`}>
+                <div className={`grid grid-cols-2 ${performanceRateStats !== null ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-4 text-center`}>
                     <div className="bg-slate-700/50 p-4 rounded-lg">
-                        <div className="text-sm font-bold text-slate-400 uppercase">Total {entityTypeLabel}</div>
-                        <div className="text-2xl font-extrabold text-white">{summaryTotals.count.toLocaleString()}</div>
+                        <div className="text-sm font-bold text-slate-400 uppercase">Filtered / Total {entityTypeLabel}</div>
+                        <div className="text-2xl font-extrabold text-white">
+                            {summaryTotals.count.toLocaleString()}
+                            {viewType === 'branches' && globalData?.branchCount2025 ? ` / ${globalData.branchCount2025}` : ''}
+                            {viewType === 'brands' && globalData?.brandCount2025 ? ` / ${globalData.brandCount2025}` : ''}
+                            {viewType === 'items' && globalData?.itemCount2025 ? ` / ${globalData.itemCount2025}` : ''}
+                        </div>
                     </div>
                     {performanceRateStats !== null && (
                         <div className="bg-slate-700/50 p-4 rounded-lg">
@@ -736,6 +823,15 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
                             <div className="text-sm font-bold text-green-400">{performanceRateStats.sold.toLocaleString()} / {performanceRateStats.total.toLocaleString()} sold</div>
                         </div>
                     )}
+                    <div className="bg-slate-700/50 p-4 rounded-lg">
+                        <div className="text-sm font-bold text-slate-400 uppercase">% Sales (Filtered)</div>
+                        <div className="text-2xl font-extrabold text-green-400">
+                            {globalData?.totalSales2025 && globalData.totalSales2025 > 0 ? ((summaryTotals.total2025 / globalData.totalSales2025) * 100).toFixed(1) + '%' : '-'}
+                        </div>
+                        <div className="text-sm font-bold text-slate-400">
+                            2024: {globalData?.totalSales2024 && globalData.totalSales2024 > 0 ? ((summaryTotals.total2024 / globalData.totalSales2024) * 100).toFixed(1) + '%' : '-'}
+                        </div>
+                    </div>
                     <div className="bg-slate-700/50 p-4 rounded-lg">
                         <div className="text-sm font-bold text-slate-400 uppercase">2025 Sales</div>
                         <div className="text-2xl font-extrabold text-green-400">{formatNumberAbbreviated(summaryTotals.total2025)}</div>
@@ -750,6 +846,36 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
                     </div>
                 </div>
             </div>
+
+            {/* Chart Section for Divisions */}
+            {viewType === 'divisions' && chartData.length > 0 && (
+                <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                    <h3 className="text-xl font-bold text-white mb-6 text-center">Sales Distribution by Division (2025)</h3>
+                    <div className="h-[400px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={chartData}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    outerRadius={150}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                >
+                                    {chartData.map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip content={<CustomTooltip />} />
+                                <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: '20px' }} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
             <div ref={filterContainerRef} className="p-6 bg-slate-800/50 rounded-2xl shadow-lg border border-slate-700">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="relative w-full md:max-w-md">
@@ -873,6 +999,46 @@ const DrilldownView: React.FC<DrilldownViewProps> = ({ allRawData, globalFilterO
                                 ))}
                             </div>
                         </div>
+                        {globalFilterOptions && visibleFilters.type && (
+                            <div className="flex flex-col h-64">
+                                <label className="block text-sm font-bold text-slate-300 mb-2 ml-1">Filter by Store Type</label>
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    className="mb-2 p-1.5 bg-slate-800 border border-slate-600 rounded text-xs text-white"
+                                    value={filterSearch.type}
+                                    onChange={(e) => setFilterSearch(prev => ({ ...prev, type: e.target.value }))}
+                                />
+                                <div className="bg-slate-700/50 rounded-lg p-2 overflow-y-auto border border-slate-600 flex-1">
+                                    {(globalFilterOptions.types || []).filter(o => o.toLowerCase().includes(filterSearch.type.toLowerCase())).map(opt => (
+                                        <label key={opt} className="flex items-center space-x-2 p-1.5 hover:bg-slate-600/50 rounded cursor-pointer transition-colors">
+                                            <input type="checkbox" checked={localFilters.type.includes(opt)} onChange={() => toggleFilter('type', opt)} className="form-checkbox h-4 w-4 text-sky-500 rounded bg-slate-800 border-slate-500" />
+                                            <span className="text-slate-300 text-sm leading-tight">{opt}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {globalFilterOptions && visibleFilters.typePlus && (
+                            <div className="flex flex-col h-64">
+                                <label className="block text-sm font-bold text-slate-300 mb-2 ml-1">Filter by Store Type Plus</label>
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    className="mb-2 p-1.5 bg-slate-800 border border-slate-600 rounded text-xs text-white"
+                                    value={filterSearch.typePlus}
+                                    onChange={(e) => setFilterSearch(prev => ({ ...prev, typePlus: e.target.value }))}
+                                />
+                                <div className="bg-slate-700/50 rounded-lg p-2 overflow-y-auto border border-slate-600 flex-1">
+                                    {(globalFilterOptions.typePluses || []).filter(o => o.toLowerCase().includes(filterSearch.typePlus.toLowerCase())).map(opt => (
+                                        <label key={opt} className="flex items-center space-x-2 p-1.5 hover:bg-slate-600/50 rounded cursor-pointer transition-colors">
+                                            <input type="checkbox" checked={localFilters.typePlus.includes(opt)} onChange={() => toggleFilter('typePlus', opt)} className="form-checkbox h-4 w-4 text-sky-500 rounded bg-slate-800 border-slate-500" />
+                                            <span className="text-slate-300 text-sm leading-tight">{opt}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
                 <div className="overflow-x-auto mt-6">

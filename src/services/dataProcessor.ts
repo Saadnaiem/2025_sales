@@ -5,14 +5,22 @@ export const normalizeRow = (row: Record<string, string>, headers: string[]): Ra
     const allPossibleHeaders = [
         'DIVISION', 'DEPARTMENT', 'CATEGORY', 'SUBCATEGORY', 'CLASS',
         'BRAND', 'BRANCH NAME', 'BRANCH CODE', 'ITEM CODE', 'ITEM DESCRIPTION',
+        'TYPE', 'TYPE Plus',
         '2024 CASH SALES', '2024 CREDIT SALES', '2024 TOTAL SALES',
         '2025 CASH SALES', '2025 CREDIT SALES', '2025 TOTAL SALES',
         // Legacy maps if needed, but we focus on new ones. 
         'SALES2024', 'SALES2025'
     ];
 
-    // Helper to find header case-insensitively
-    const findHeader = (target: string) => headers.find(h => h.trim().toUpperCase() === target);
+    const findHeader = (target: string) => {
+        let match = headers.find(h => h.trim().toUpperCase() === target.toUpperCase());
+        if (!match) {
+            // Fuzzy match fallback: strip all non-alphanumeric chars and compare
+            const cleanTarget = target.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            match = headers.find(h => h.toUpperCase().replace(/[^A-Z0-9]/g, '') === cleanTarget);
+        }
+        return match;
+    };
 
     for (const header of allPossibleHeaders) {
         const fileHeader = findHeader(header);
@@ -64,7 +72,9 @@ export const normalizeRow = (row: Record<string, string>, headers: string[]): Ra
         normalized['BRANCH NAME'],
         normalized['BRANCH CODE'],
         normalized['ITEM CODE'],
-        normalized['ITEM DESCRIPTION']
+        normalized['ITEM DESCRIPTION'],
+        normalized['TYPE'],
+        normalized['TYPE Plus']
     ].map(val => String(val || '').toLowerCase()).join(' ');
 
     return normalized as RawSalesDataRow;
@@ -129,6 +139,8 @@ export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?
     const brands: { [key: string]: SalesAgg } = {};
     const branches: { [key: string]: SalesAgg } = {};
     const items: { [key: string]: SalesAgg } = {};
+    const types: { [key: string]: SalesAgg } = {};
+    const typePluses: { [key: string]: SalesAgg } = {};
 
     const distinct = {
         branches24: new Set<string>(), branches25: new Set<string>(),
@@ -179,6 +191,8 @@ export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?
         aggregate(brands, row['BRAND']);
         aggregate(branches, row['BRANCH NAME'], row['BRANCH CODE']);
         aggregate(items, row['ITEM DESCRIPTION'], row['ITEM CODE']);
+        aggregate(types, row['TYPE'] || '');
+        aggregate(typePluses, row['TYPE Plus'] || '');
 
         // Distinct counting for KPIs (using filtered Sales > 0 as active criteria)
         const active24 = saleType === 'ALL' ? total24 : (saleType === 'CASH' ? cash24 : credit24);
@@ -241,6 +255,8 @@ export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?
     const salesByBrand = transform(brands).sort((a, b) => b.sales2025 - a.sales2025);
     const salesByBranch = transform(branches).sort((a, b) => b.sales2025 - a.sales2025);
     const salesByItem = transform(items).sort((a, b) => b.sales2025 - a.sales2025);
+    const salesByType = transform(types).sort((a, b) => b.sales2025 - a.sales2025);
+    const salesByTypePlus = transform(typePluses).sort((a, b) => b.sales2025 - a.sales2025);
 
     const top10Brands = salesByBrand.slice(0, 10).map(({ name, sales2024, sales2025 }) => ({ name, sales2024, sales2025 }));
     const top50Items = salesByItem.slice(0, 50).map(({ name, sales2024, sales2025 }) => ({ name, sales2024, sales2025 }));
@@ -329,6 +345,8 @@ export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?
         salesByBrand,
         salesByBranch,
         salesByItem,
+        salesByType,
+        salesByTypePlus,
         top10Brands,
         top50Items,
         topDivision,
@@ -360,6 +378,8 @@ export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?
         filterOptions: existingFilterOptions ? {
             ...existingFilterOptions,
             items: (existingFilterOptions as any).items || [...new Set(data.map(r => r['ITEM DESCRIPTION']))].filter((x): x is string => !!x).sort(),
+            types: (existingFilterOptions as any).types || [...new Set(data.map(r => r['TYPE']))].filter((x): x is string => !!x).sort(),
+            typePluses: (existingFilterOptions as any).typePluses || [...new Set(data.map(r => r['TYPE Plus']))].filter((x): x is string => !!x).sort(),
         } : {
             divisions: [...new Set(data.map(r => r['DIVISION']))].filter((x): x is string => !!x).sort(),
             departments: [...new Set(data.map(r => r['DEPARTMENT']))].filter((x): x is string => !!x).sort(),
@@ -369,6 +389,8 @@ export const processSalesData = (data: RawSalesDataRow[], existingFilterOptions?
             branches: [...new Set(data.map(r => r['BRANCH NAME']))].filter((x): x is string => !!x).sort(),
             brands: [...new Set(data.map(r => r['BRAND']))].filter((x): x is string => !!x).sort(),
             items: [...new Set(data.map(r => r['ITEM DESCRIPTION']))].filter((x): x is string => !!x).sort(),
+            types: [...new Set(data.map(r => r['TYPE']))].filter((x): x is string => !!x).sort(),
+            typePluses: [...new Set(data.map(r => r['TYPE Plus']))].filter((x): x is string => !!x).sort(),
         },
     };
 };

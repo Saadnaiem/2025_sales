@@ -16,7 +16,7 @@ import MainLayout from './components/MainLayout';
 const createEmptyProcessedData = (filterOptions: ProcessedData['filterOptions']): ProcessedData => ({
     totalSales2024: 0, totalSales2025: 0, totalCashSales2024: 0, totalCashSales2025: 0, totalCreditSales2024: 0, totalCreditSales2025: 0, salesGrowthPercentage: 0,
     salesByDivision: [], salesByDepartment: [], salesByCategory: [], salesBySubcategory: [], salesByClass: [],
-    salesByBrand: [], salesByBranch: [], salesByItem: [],
+    salesByBrand: [], salesByBranch: [], salesByItem: [], salesByType: [], salesByTypePlus: [],
     top10Brands: [], top50Items: [], branchCount2024: 0, branchCount2025: 0, brandCount2024: 0, brandCount2025: 0, itemCount2024: 0,
     itemCount2025: 0, topDivision: null,
     pareto: {
@@ -45,7 +45,7 @@ const App: React.FC = () => {
     const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
     const [filters, setFilters] = useState<FilterState>({
         divisions: [], departments: [], categories: [], subcategories: [], classes: [],
-        branches: [], brands: [], items: [], saleType: 'ALL'
+        branches: [], brands: [], items: [], types: [], typePluses: [], saleType: 'ALL'
     });
     const [searchTerm, setSearchTerm] = useState('');
     const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem('isAuthenticated') === 'true');
@@ -152,7 +152,7 @@ const App: React.FC = () => {
 
         return allData.filter(row => {
             // Dropdown filters
-            const { divisions, departments, categories, branches, brands } = filters;
+            const { divisions, departments, categories, branches, brands, types, typePluses } = filters;
 
             // Fast fail checks
             if (divisions.length > 0 && !divisions.includes(row['DIVISION'])) return false;
@@ -161,6 +161,8 @@ const App: React.FC = () => {
             if (categories.length > 0 && (!row['CATEGORY'] || !categories.includes(row['CATEGORY']))) return false;
             if (branches.length > 0 && !branches.includes(row['BRANCH NAME'])) return false;
             if (brands.length > 0 && !brands.includes(row['BRAND'])) return false;
+            if (types.length > 0 && (!row['TYPE'] || !types.includes(row['TYPE']))) return false;
+            if (typePluses.length > 0 && (!row['TYPE Plus'] || !typePluses.includes(row['TYPE Plus']))) return false;
 
             // Search term filter using optimized index
             if (lowercasedTerm) {
@@ -178,7 +180,9 @@ const App: React.FC = () => {
                     (row['ITEM DESCRIPTION']?.toLowerCase().includes(lowercasedTerm)) ||
                     (row['ITEM CODE']?.toLowerCase().includes(lowercasedTerm)) ||
                     (row['CLASS']?.toLowerCase().includes(lowercasedTerm)) ||
-                    (row['SUBCATEGORY']?.toLowerCase().includes(lowercasedTerm))
+                    (row['SUBCATEGORY']?.toLowerCase().includes(lowercasedTerm)) ||
+                    (row['TYPE']?.toLowerCase().includes(lowercasedTerm)) ||
+                    (row['TYPE Plus']?.toLowerCase().includes(lowercasedTerm))
                 );
             }
 
@@ -194,7 +198,7 @@ const App: React.FC = () => {
         // If no rows match the filters, return an empty processed data structure
         return createEmptyProcessedData(processedData?.filterOptions || {
             divisions: [], departments: [], categories: [], subcategories: [], classes: [],
-            branches: [], brands: [], items: []
+            branches: [], brands: [], items: [], types: [], typePluses: []
         });
     }, [filteredRows, processedData?.filterOptions, filters.saleType]);
 
@@ -304,19 +308,20 @@ const App: React.FC = () => {
                     <Route
                         path="/"
                         element={
-                            <Dashboard
-                                data={processedFilteredData!}
-                                filters={filters}
-                                onFilterChange={setFilters}
-                                onLogout={handleLogout}
-                                searchTerm={searchTerm}
-                                onSearchChange={setSearchTerm}
-                            />
+                                <Dashboard
+                                    data={processedFilteredData!}
+                                    filters={filters}
+                                    onFilterChange={setFilters}
+                                    onLogout={handleLogout}
+                                    searchTerm={searchTerm}
+                                    onSearchChange={setSearchTerm}
+                                    globalData={processedData!}
+                                />
                         }
                     />
                     <Route
                         path="/details/:viewType"
-                        element={<DrilldownView allRawData={filteredRows} globalFilterOptions={processedFilteredData?.filterOptions} />}
+                        element={<DrilldownView allRawData={filteredRows} globalFilterOptions={processedFilteredData?.filterOptions} globalData={processedData!} />}
                     />
                 </Route>
             </Routes>

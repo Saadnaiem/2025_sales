@@ -127,6 +127,8 @@ const FilterControls: React.FC<FilterControlsProps> = ({ options, filters, onFil
                     {renderFilterGroup('Class', 'classes', options.classes)}
                     {renderFilterGroup('Branch', 'branches', options.branches)}
                     {renderFilterGroup('Brand', 'brands', options.brands)}
+                    {renderFilterGroup('Store Type', 'types', options.types)}
+                    {renderFilterGroup('Store Type Plus', 'typePluses', options.typePluses)}
 
                     {/* Sale Type moved to top bar */}
                     <div className="md:hidden">

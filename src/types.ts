@@ -10,6 +10,8 @@ export interface RawSalesDataRow {
     'BRANCH NAME': string;
     'ITEM CODE'?: string;
     'ITEM DESCRIPTION': string;
+    'TYPE'?: string;
+    'TYPE Plus'?: string;
 
     // 2024 Metrics
     '2024 CASH SALES': number;
@@ -69,6 +71,8 @@ export interface ProcessedData {
     salesByBrand: EntitySalesData[];
     salesByBranch: EntitySalesData[];
     salesByItem: EntitySalesData[];
+    salesByType: EntitySalesData[];
+    salesByTypePlus: EntitySalesData[];
 
     top10Brands: { name: string; sales2024: number; sales2025: number }[];
     top50Items: { name: string; sales2024: number; sales2025: number }[];
@@ -120,6 +124,8 @@ export interface ProcessedData {
         branches: string[];
         brands: string[];
         items: string[];
+        types: string[];
+        typePluses: string[];
     };
 }
 
@@ -132,5 +138,7 @@ export interface FilterState {
     branches: string[];
     brands: string[];
     items: string[];
+    types: string[];
+    typePluses: string[];
     saleType: 'ALL' | 'CASH' | 'CREDIT';
 }
