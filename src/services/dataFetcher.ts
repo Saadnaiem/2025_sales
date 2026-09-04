@@ -32,13 +32,32 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
             }
         }
     } catch (e) {
-        console.warn("Local file fetch failed, trying GDrive...", e);
+        console.warn("Local file fetch failed, trying Cloudflare...", e);
     }
 
-    // 2. Try Google Drive Proxies
+    // 2. Try Cloudflare Pages D1 SQLite API first (Fastest & most robust)
+    try {
+        onProgress('Loading secure records from Cloudflare D1...');
+        const response = await fetch(CLOUDFLARE_URL);
+
+        if (response.ok) {
+            const csvText = await response.text();
+            
+            // Basic validation to ensure we received proper CSV text data
+            if (!csvText.trim().startsWith('<') && csvText.length > 100) {
+                return { data: csvText, error: null };
+            }
+        } else {
+            console.warn(`Cloudflare API returned error status: ${response.statusText}`);
+        }
+    } catch (err) {
+        console.warn("Cloudflare API request failed, trying GDrive and proxies...", err);
+    }
+
+    // 3. Failover to Google Drive Proxies (As a fallback backup)
     for (const [index, url] of PROXIES.entries()) {
         try {
-            onProgress(`Attempting download via proxy ${index + 1}...`);
+            onProgress(`Attempting fallback via proxy ${index + 1}...`);
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -59,23 +78,6 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
             console.warn(`Proxy ${index + 1} error:`, err);
             // Continue to next proxy
         }
-    }
-
-    // 3. Failover to Cloudflare CDN / Worker / R2
-    try {
-        onProgress('Failing over to Cloudflare high-performance CDN...');
-        const response = await fetch(CLOUDFLARE_URL);
-
-        if (response.ok) {
-            const csvText = await response.text();
-            
-            // Basic validation to ensure we received proper CSV text data
-            if (!csvText.trim().startsWith('<') && csvText.length > 100) {
-                return { data: csvText, error: null };
-            }
-        }
-    } catch (err) {
-        console.warn("Cloudflare failover request failed:", err);
     }
 
     return { 
