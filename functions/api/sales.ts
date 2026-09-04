@@ -80,65 +80,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       });
     }
 
-    // List of keys in order to build correct CSV structure (what the React app expects)
-    const keys = [
-      'DIVISION', 'DEPARTMENT', 'CATEGORY', 'SUBCATEGORY', 'CLASS',
-      'BRAND', 'BRANCH NAME', 'BRANCH CODE', 'ITEM CODE', 'ITEM DESCRIPTION',
-      'TYPE', 'TYPE Plus',
-      '2024 CASH SALES', '2024 CREDIT SALES', '2024 TOTAL SALES',
-      '2025 CASH SALES', '2025 CREDIT SALES', '2025 TOTAL SALES'
-    ];
-
-    // 2. Map target keys to database columns ONCE (instead of doing matches inside the loop)
-    const firstRow = results[0];
-    const dbKeyMap = keys.map(key => {
-      // 1. Direct match
-      if (firstRow[key] !== undefined) return key;
-
-      // 2. Lowercase match
+    // Get all column keys directly from the database result (excluding the database id column)
+    const dbColumns = Object.keys(results[0]).filter(key => {
       const lowerKey = key.toLowerCase();
-      if (firstRow[lowerKey] !== undefined) return lowerKey;
-
-      // 3. Snake case match
-      const snakeKey = key.replace(/\s+/g, '_').toLowerCase();
-      if (firstRow[snakeKey] !== undefined) return snakeKey;
-
-      // 4. Compact match
-      const compactKey = key.replace(/[^A-Z0-9]/gi, '').toLowerCase();
-      if (firstRow[compactKey] !== undefined) return compactKey;
-
-      // 5. Cloudflare D1 CSV importing prefix check
-      const prefixedSnakeKey = `_${snakeKey}`;
-      if (firstRow[prefixedSnakeKey] !== undefined) return prefixedSnakeKey;
-
-      const prefixedCompactKey = `_${compactKey}`;
-      if (firstRow[prefixedCompactKey] !== undefined) return prefixedCompactKey;
-
-      // fallback: look for dynamic keys
-      const cleanTarget = key.replace(/[^A-Z0-9]/gi, '').toLowerCase();
-      
-      // We perform standard word-fragment checks for complex column alignments
-      // (e.g. aligning "2025 TOTAL SALES" with "sales_2025_total" or "total_sales_2025")
-      const wordsInKey = key.toLowerCase().split(/[^a-z0-9]+/g).filter(Boolean);
-
-      for (const actualKey of Object.keys(firstRow)) {
-        const lowerActual = actualKey.toLowerCase();
-        if (lowerActual === 'id') continue; // Always ignore auto-generated ID columns so they don't hijack matches
-        
-        const cleanActual = lowerActual.replace(/[^A-Z0-9]/gi, '');
-        if (cleanActual === cleanTarget) {
-          return actualKey;
-        }
-
-        // Check if all letters and numbers in our target are inside the DB column in some order
-        // E.g. "2025", "total", and "sales" must ALL match in the actual column "sales_2025_total"
-        const isMatch = wordsInKey.every(word => lowerActual.includes(word));
-        if (isMatch) {
-          return actualKey;
-        }
-      }
-
-      return null; // Column not found in SQL
+      return lowerKey !== 'id' && lowerKey !== '_id';
     });
 
     // Helper to escape CSV values
@@ -151,25 +96,28 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return str;
     };
 
-    // 3. Generate CSV Core Content in a single fast iteration (No internal loops, regex, or fallback runs)
-    const headerRow = keys.join(',');
+    // 2. Map SQLite column names back to standard CSV user-friendly headers
+    // (e.g. "_2024_cash_sales" -> "2024 CASH SALES", "branch_name" -> "BRANCH NAME")
+    const headerRow = dbColumns.map(key => {
+      return key.toUpperCase().replace(/_/g, ' ').trim();
+    }).join(',');
     
+    // 3. Generate CSV rows using original SQLite values directly to prevent key mismatching!
     let csvContent = headerRow + '\n';
     const rowCount = results.length;
     for (let i = 0; i < rowCount; i++) {
       const row = results[i];
       let rowStr = '';
-      for (let j = 0; j < dbKeyMap.length; j++) {
-        const dbKey = dbKeyMap[j];
-        const val = dbKey ? row[dbKey] : '';
-        rowStr += (j === 0 ? '' : ',') + escapeCsvValue(val);
+      for (let j = 0; j < dbColumns.length; j++) {
+        const col = dbColumns[j];
+        rowStr += (j === 0 ? '' : ',') + escapeCsvValue(row[col]);
       }
       csvContent += rowStr + '\n';
     }
 
     // Determine the last processed ID in this result slice to send back in headers
     let lastId = 0;
-    const dbIdKey = Object.keys(firstRow).find(key => key.toLowerCase() === 'id');
+    const dbIdKey = Object.keys(results[0]).find(key => key.toLowerCase() === 'id');
     if (dbIdKey && results.length > 0) {
       lastId = results[results.length - 1][dbIdKey] || 0;
     }
