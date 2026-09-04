@@ -31,7 +31,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       });
     }
 
-    // List of keys in order to build correct CSV structure
+    // List of keys in order to build correct CSV structure (what the React app expects)
     const keys = [
       'DIVISION', 'DEPARTMENT', 'CATEGORY', 'SUBCATEGORY', 'CLASS',
       'BRAND', 'BRANCH NAME', 'BRANCH CODE', 'ITEM CODE', 'ITEM DESCRIPTION',
@@ -50,20 +50,47 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return str;
     };
 
+    // Helper to find the matching column in the database row regardless of formatting
+    const findValueInRow = (row: any, targetKey: string) => {
+      // 1. Direct match (e.g. "DIVISION", "BRANCH NAME")
+      if (row[targetKey] !== undefined) return row[targetKey];
+
+      // 2. Direct lowercase match (e.g. "division")
+      const lowerKey = targetKey.toLowerCase();
+      if (row[lowerKey] !== undefined) return row[lowerKey];
+
+      // 3. Underscore lowercase match (e.g. "branch_name", "type_plus")
+      const snakeKey = targetKey.replace(/\s+/g, '_').toLowerCase();
+      if (row[snakeKey] !== undefined) return row[snakeKey];
+
+      // 4. Compact lowercase match (e.g. "branchcode", "2024cashsales")
+      const compactKey = targetKey.replace(/[^A-Z0-9]/gi, '').toLowerCase();
+      if (row[compactKey] !== undefined) return row[compactKey];
+
+      // 5. Cloudflare D1 CSV importing often prefix numbers with underscores (e.g. "_2024_cash_sales" or "_2024_total_sales")
+      const prefixedSnakeKey = `_${snakeKey}`;
+      if (row[prefixedSnakeKey] !== undefined) return row[prefixedSnakeKey];
+
+      const prefixedCompactKey = `_${compactKey}`;
+      if (row[prefixedCompactKey] !== undefined) return row[prefixedCompactKey];
+
+      // fallback: look for dynamic keys where alphanumeric values match
+      const cleanTarget = targetKey.replace(/[^A-Z0-9]/gi, '').toLowerCase();
+      for (const actualKey of Object.keys(row)) {
+        if (actualKey.replace(/[^A-Z0-9]/gi, '').toLowerCase() === cleanTarget) {
+          return row[actualKey];
+        }
+      }
+
+      return '';
+    };
+
     // 2. Generate CSV Header Row
     const headerRow = keys.join(',');
 
     // 3. Generate CSV Data Rows
     const dataRows = results.map((row: any) => {
-      return keys.map(key => {
-        // Try exact key, lowercase key, or underscored key
-        const dbKey = row[key] !== undefined ? key : 
-                      row[key.toLowerCase()] !== undefined ? key.toLowerCase() :
-                      row[key.replace(/\s+/g, '_').toLowerCase()] !== undefined ? key.replace(/\s+/g, '_').toLowerCase() :
-                      row[key.replace(/\s+/g, '').toLowerCase()];
-        
-        return escapeCsvValue(row[dbKey]);
-      }).join(',');
+      return keys.map(key => escapeCsvValue(findValueInRow(row, key))).join(',');
     });
 
     const csvContent = [headerRow, ...dataRows].join('\n');
