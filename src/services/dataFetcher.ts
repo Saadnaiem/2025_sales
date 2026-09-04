@@ -86,7 +86,7 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
             }
 
             // Parse lines in chunk to estimate if we have reached the end of the SQLite table
-            const rowCountInChunk = chunkText.split('\n').length - 1; // subtract header
+            const rowCountInChunk = chunkText.split('\n').filter(Boolean).length - 1; // subtract header, guard empty lines
             if (rowCountInChunk < CHUNK_SIZE - 2) {
                 // Not a full chunk, SQL returned less than the Limit, therefore we loaded everything!
                 hasMoreData = false;
