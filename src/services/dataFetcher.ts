@@ -34,7 +34,20 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
             const response = await fetch(`${CLOUDFLARE_URL}?limit=${CHUNK_SIZE}&offset=${offset}`);
 
             if (!response.ok) {
-                throw new Error(`D1 query failed at offset ${offset}: ${response.statusText}`);
+                let errorDetails = response.statusText;
+                try {
+                    const text = await response.text();
+                    if (text.startsWith('Error,Message')) {
+                        // Extract the message from the custom D1 error CSV response
+                        const parts = text.split('\n')[1]?.split(',');
+                        if (parts && parts.length > 1) {
+                            errorDetails = parts.slice(1).join(',').replace(/^"|"$/g, '');
+                        }
+                    }
+                } catch (e) {
+                    console.error("Could not parse Error response", e);
+                }
+                throw new Error(`D1 query failed at offset ${offset}: ${errorDetails}`);
             }
 
             const chunkText = await response.text();
@@ -75,8 +88,17 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
         } else {
             console.warn("Cloudflare D1 returned empty rows or connection timed out, trying fallback...");
         }
-    } catch (err) {
+    } catch (err: any) {
         console.warn("Cloudflare D1 fast query failed. Resorting to local file fallback...", err);
+        // Direct diagnostic helper: If we are on live domain, return the database error immediately 
+        // to prevent the rating-limit gray page from the outdated public proxy fallbacks
+        const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+        if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+            return {
+                data: null,
+                error: `Cloudflare Database Error: ${err.message || 'Connection Interrupted'}. Please verify your Cloudflare Pages Settings -> Functions -> D1 Database Binding.`
+            };
+        }
     }
 
     // 2. Try fetching local file second (best fallback if on localhost or testing)
