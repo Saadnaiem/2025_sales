@@ -21,6 +21,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const url = new URL(context.request.url);
     const limitParam = url.searchParams.get('limit') || '25000';
     const offsetParam = url.searchParams.get('offset') || '0';
+    const debugParam = url.searchParams.get('debug');
 
     const limit = parseInt(limitParam, 10);
     const offset = parseInt(offsetParam, 10);
@@ -52,6 +53,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
         },
+      });
+    }
+
+    // Direct JSON output for debugging: If query param debug=true exists, output the raw row keys
+    if (debugParam === 'true') {
+      return new Response(JSON.stringify({
+        rowCount: results.length,
+        firstRowKeys: Object.keys(results[0]),
+        firstRowValues: results[0]
+      }, null, 2), {
+        headers: {
+          "Content-Type": "application/json"
+        }
       });
     }
 
@@ -92,6 +106,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       // fallback: look for dynamic keys
       const cleanTarget = key.replace(/[^A-Z0-9]/gi, '').toLowerCase();
       for (const actualKey of Object.keys(firstRow)) {
+        if (actualKey.toLowerCase() === 'id') continue; // Always ignore auto-generated ID columns so they don't hijack matches
         if (actualKey.replace(/[^A-Z0-9]/gi, '').toLowerCase() === cleanTarget) {
           return actualKey;
         }
