@@ -116,9 +116,24 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
       // fallback: look for dynamic keys
       const cleanTarget = key.replace(/[^A-Z0-9]/gi, '').toLowerCase();
+      
+      // We perform standard word-fragment checks for complex column alignments
+      // (e.g. aligning "2025 TOTAL SALES" with "sales_2025_total" or "total_sales_2025")
+      const wordsInKey = key.toLowerCase().split(/[^a-z0-9]+/g).filter(Boolean);
+
       for (const actualKey of Object.keys(firstRow)) {
-        if (actualKey.toLowerCase() === 'id') continue; // Always ignore auto-generated ID columns so they don't hijack matches
-        if (actualKey.replace(/[^A-Z0-9]/gi, '').toLowerCase() === cleanTarget) {
+        const lowerActual = actualKey.toLowerCase();
+        if (lowerActual === 'id') continue; // Always ignore auto-generated ID columns so they don't hijack matches
+        
+        const cleanActual = lowerActual.replace(/[^A-Z0-9]/gi, '');
+        if (cleanActual === cleanTarget) {
+          return actualKey;
+        }
+
+        // Check if all letters and numbers in our target are inside the DB column in some order
+        // E.g. "2025", "total", and "sales" must ALL match in the actual column "sales_2025_total"
+        const isMatch = wordsInKey.every(word => lowerActual.includes(word));
+        if (isMatch) {
           return actualKey;
         }
       }
