@@ -19,27 +19,29 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
     // Get limit and offset query params from request
     const url = new URL(context.request.url);
-    const limitParam = url.searchParams.get('limit');
-    const offsetParam = url.searchParams.get('offset');
+    const limitParam = url.searchParams.get('limit') || '25000';
+    const offsetParam = url.searchParams.get('offset') || '0';
+
+    const limit = parseInt(limitParam, 10);
+    const offset = parseInt(offsetParam, 10);
 
     let results: any[] = [];
-
-    if (limitParam && offsetParam !== null) {
-      const limit = parseInt(limitParam, 10);
-      const offset = parseInt(offsetParam, 10);
-      
-      const { results: paginatedResults } = await context.env.DB.prepare(
-        "SELECT * FROM sales LIMIT ? OFFSET ?"
-      ).bind(limit, offset).all();
-      
-      results = paginatedResults || [];
-    } else {
-      // Fallback: Fetch a smaller chunk by default to prevent crashing if no pagination is supplied
-      const { results: defaultResults } = await context.env.DB.prepare(
-        "SELECT * FROM sales LIMIT 20000"
-      ).all();
-      
-      results = defaultResults || [];
+    
+    // We add dynamic query preparation to handle potential D1 connection configurations
+    try {
+      const stmt = context.env.DB.prepare("SELECT * FROM sales LIMIT ? OFFSET ?").bind(limit, offset);
+      const res = await stmt.all();
+      results = res.results || [];
+    } catch (sqlError: any) {
+      return new Response(
+        `Error,Message\n"SQL Execution Failure","Failed to run query on table 'sales': ${sqlError.message.replace(/"/g, '""')}"`,
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+          },
+        }
+      );
     }
 
     if (!results || results.length === 0) {
