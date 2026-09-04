@@ -4,6 +4,19 @@ interface Env {
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
+    // Check if the D1 database is bound correctly in your Cloudflare Pages Settings
+    if (!context.env || !context.env.DB) {
+      return new Response(
+        `Error,Message\n"Database configuration error","The D1 Database binding named 'DB' is missing. Please go to your Cloudflare Pages project under Settings > Functions -> D1 Database bindings and add a binding with the exact name 'DB' pointing to your D1 database."`,
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+          },
+        }
+      );
+    }
+
     // 1. Fetch all rows from your SQLite tables in D1
     // Adjust the table name 'sales' if you named it differently
     const { results } = await context.env.DB.prepare(
