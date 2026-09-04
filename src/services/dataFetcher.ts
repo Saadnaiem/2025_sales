@@ -6,11 +6,14 @@ interface FetchResult {
 
 const GDRIVE_ID = '14kcUoSBdErxO2f5nE-oVggWDGxUOAGyt';
 
+// Cloudflare Pages D1 SQLite API Function relative URL
+const CLOUDFLARE_URL = '/api/sales';
+
 // List of proxies to try in order
 const PROXIES = [
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${GDRIVE_ID}`)}`,
-    `https://corsproxy.io/?https://drive.google.com/uc?export=download&id=${GDRIVE_ID}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${GDRIVE_ID}`)}`,
+    `https://corsproxy.io/?https://drive.google.com/uc?export=download&id=${GDRIVE_ID}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${GDRIVE_ID}`)}`,
     `https://thingproxy.freeboard.io/fetch/https://drive.google.com/uc?export=download&id=${GDRIVE_ID}`
 ];
 
@@ -29,10 +32,10 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
             }
         }
     } catch (e) {
-        console.warn("Local file fetch failed, trying proxies...", e);
+        console.warn("Local file fetch failed, trying GDrive...", e);
     }
 
-    // 2. Try proxies
+    // 2. Try Google Drive Proxies
     for (const [index, url] of PROXIES.entries()) {
         try {
             onProgress(`Attempting download via proxy ${index + 1}...`);
@@ -58,5 +61,25 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
         }
     }
 
-    return { data: null, error: "All data fetch attempts failed. Please verify internet connection or place 'sales_data.csv' in the public folder." };
+    // 3. Failover to Cloudflare CDN / Worker / R2
+    try {
+        onProgress('Failing over to Cloudflare high-performance CDN...');
+        const response = await fetch(CLOUDFLARE_URL);
+
+        if (response.ok) {
+            const csvText = await response.text();
+            
+            // Basic validation to ensure we received proper CSV text data
+            if (!csvText.trim().startsWith('<') && csvText.length > 100) {
+                return { data: csvText, error: null };
+            }
+        }
+    } catch (err) {
+        console.warn("Cloudflare failover request failed:", err);
+    }
+
+    return { 
+        data: null, 
+        error: "Automatic download failed. Please upload the 'sales_data.csv' file manually." 
+    };
 };
