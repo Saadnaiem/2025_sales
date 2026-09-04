@@ -20,22 +20,63 @@ const PROXIES = [
 export const fetchSalesData = async (onProgress: (message: string) => void): Promise<FetchResult> => {
 
     // 1. Try Cloudflare Pages D1 SQLite API first (Fastest, secure & most up-to-date)
+    // We fetch in paginated chunks to bypass Cloudflare's serverless CPU execution and memory limitations!
     try {
-        onProgress('Loading secure records from Cloudflare D1...');
-        const response = await fetch(CLOUDFLARE_URL);
+        onProgress('Connecting to Cloudflare D1...');
+        const CHUNK_SIZE = 25000;
+        let offset = 0;
+        let combinedCsvText = '';
+        let hasMoreData = true;
+        let chunkIndex = 1;
 
-        if (response.ok) {
-            const csvText = await response.text();
-            
-            // Basic validation to ensure we received proper CSV text data (not an HTML error page)
-            if (!csvText.trim().startsWith('<') && csvText.length > 100) {
-                return { data: csvText, error: null };
+        while (hasMoreData) {
+            onProgress(`Loading secure records from Cloudflare D1 (Page ${chunkIndex})...`);
+            const response = await fetch(`${CLOUDFLARE_URL}?limit=${CHUNK_SIZE}&offset=${offset}`);
+
+            if (!response.ok) {
+                throw new Error(`D1 query failed at offset ${offset}: ${response.statusText}`);
             }
+
+            const chunkText = await response.text();
+            const trimmedChunk = chunkText.trim();
+
+            if (trimmedChunk === '' || trimmedChunk.startsWith('Error,Message')) {
+                hasMoreData = false;
+                break;
+            }
+
+            // If it's the first page, we grab the Header and the data.
+            // If it's subsequent pages, we strip the header row so rows align continuously!
+            if (offset === 0) {
+                combinedCsvText += chunkText;
+            } else {
+                const lines = chunkText.split('\n');
+                // Remove header line
+                lines.shift();
+                const cleanText = lines.join('\n');
+                if (cleanText.trim().length > 0) {
+                    combinedCsvText += '\n' + cleanText;
+                }
+            }
+
+            // Parse lines in chunk to estimate if we have reached the end of the SQLite table
+            const rowCountInChunk = chunkText.split('\n').length - 1; // subtract header
+            if (rowCountInChunk < CHUNK_SIZE - 2) {
+                // Not a full chunk, SQL returned less than the Limit, therefore we loaded everything!
+                hasMoreData = false;
+            } else {
+                offset += CHUNK_SIZE;
+                chunkIndex++;
+            }
+        }
+
+        if (combinedCsvText.trim().length > 200) {
+            return { data: combinedCsvText, error: null };
         } else {
-            console.warn(`Cloudflare API returned error status: ${response.statusText}`);
+            console.warn("Cloudflare D1 returned empty rows or connection timed out, trying fallback...");
         }
     } catch (err) {
-        console.warn("Cloudflare API request failed, trying local file fallback...", err);
+        console.warn("Cloudflare D1 fast query failed. Resorting to local file fallback...", err);
     }
 
     // 2. Try fetching local file second (best fallback if on localhost or testing)

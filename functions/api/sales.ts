@@ -17,14 +17,36 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       );
     }
 
-    // 1. Fetch all rows from your SQLite tables in D1
-    // Adjust the table name 'sales' if you named it differently
-    const { results } = await context.env.DB.prepare(
-      "SELECT * FROM sales"
-    ).all();
+    // Get limit and offset query params from request
+    const url = new URL(context.request.url);
+    const limitParam = url.searchParams.get('limit');
+    const offsetParam = url.searchParams.get('offset');
+
+    let results: any[] = [];
+
+    if (limitParam && offsetParam !== null) {
+      const limit = parseInt(limitParam, 10);
+      const offset = parseInt(offsetParam, 10);
+      
+      const { results: paginatedResults } = await context.env.DB.prepare(
+        "SELECT * FROM sales LIMIT ? OFFSET ?"
+      ).bind(limit, offset).all();
+      
+      results = paginatedResults || [];
+    } else {
+      // Fallback: Fetch a smaller chunk by default to prevent crashing if no pagination is supplied
+      const { results: defaultResults } = await context.env.DB.prepare(
+        "SELECT * FROM sales LIMIT 20000"
+      ).all();
+      
+      results = defaultResults || [];
+    }
 
     if (!results || results.length === 0) {
-      return new Response("DIVISION,DEPARTMENT,CATEGORY,SUBCATEGORY,CLASS,BRAND,BRANCH NAME,BRANCH CODE,ITEM CODE,ITEM DESCRIPTION,TYPE,TYPE Plus,2024 CASH SALES,2024 CREDIT SALES,2024 TOTAL SALES,2025 CASH SALES,2025 CREDIT SALES,2025 TOTAL SALES\n", {
+      // Return empty response with code 204 or empty string (not headers) 
+      // so the frontend knows there's no more data in the pagination chain
+      return new Response("", {
+        status: 200,
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
         },
