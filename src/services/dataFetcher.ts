@@ -20,10 +20,11 @@ const PROXIES = [
 export const fetchSalesData = async (onProgress: (message: string) => void): Promise<FetchResult> => {
 
     // 1. Try Cloudflare Pages D1 SQLite API first (Fastest, secure & most up-to-date)
-    // We fetch in paginated chunks to bypass Cloudflare's serverless CPU execution and memory limitations!
+    // We fetch in paginated keyset chunks to bypass Cloudflare's serverless CPU execution and memory limitations!
     try {
         onProgress('Connecting to Cloudflare D1...');
         const CHUNK_SIZE = 25000;
+        let lastId: string | null = null;
         let offset = 0;
         let combinedCsvText = '';
         let hasMoreData = true;
@@ -31,7 +32,16 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
 
         while (hasMoreData) {
             onProgress(`Loading secure records from Cloudflare D1 (Page ${chunkIndex})...`);
-            const response = await fetch(`${CLOUDFLARE_URL}?limit=${CHUNK_SIZE}&offset=${offset}`);
+            
+            // Build the URL, switching to lightning-fast O(log N) keyset lastId pagination after page 1
+            let requestUrl = `${CLOUDFLARE_URL}?limit=${CHUNK_SIZE}`;
+            if (lastId) {
+                requestUrl += `&lastId=${lastId}`;
+            } else {
+                requestUrl += `&offset=${offset}`;
+            }
+
+            const response = await fetch(requestUrl);
 
             if (!response.ok) {
                 let errorDetails = response.statusText;
@@ -57,6 +67,9 @@ export const fetchSalesData = async (onProgress: (message: string) => void): Pro
                 hasMoreData = false;
                 break;
             }
+
+            // Retrieve the custom header indicating the last ID processed (to avoid costly unindexed OFFSET operations)
+            lastId = response.headers.get('X-Last-ID');
 
             // If it's the first page, we grab the Header and the data.
             // If it's subsequent pages, we strip the header row so rows align continuously!

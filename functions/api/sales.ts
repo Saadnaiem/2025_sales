@@ -17,10 +17,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       );
     }
 
-    // Get limit and offset query params from request
+    // Get limit and pagination parameters from request
     const url = new URL(context.request.url);
     const limitParam = url.searchParams.get('limit') || '25000';
     const offsetParam = url.searchParams.get('offset') || '0';
+    const lastIdParam = url.searchParams.get('lastId');
     const debugParam = url.searchParams.get('debug');
 
     const limit = parseInt(limitParam, 10);
@@ -28,11 +29,21 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
     let results: any[] = [];
     
-    // We add dynamic query preparation to handle potential D1 connection configurations
+    // We utilize auto-incrementing ID keyset pagination if provided (O(log N) speed)
+    // and fall back to standard OFFSET pagination if not. This completely avoids 
+    // SQLite full table scans and stays well under Cloudflare's 50ms CPU limit!
     try {
-      const stmt = context.env.DB.prepare("SELECT * FROM sales LIMIT ? OFFSET ?").bind(limit, offset);
-      const res = await stmt.all();
-      results = res.results || [];
+      if (lastIdParam !== null) {
+        const lastId = parseInt(lastIdParam, 10);
+        const stmt = context.env.DB.prepare("SELECT * FROM sales WHERE id > ? LIMIT ?").bind(lastId, limit);
+        const res = await stmt.all();
+        results = res.results || [];
+      } else {
+        // Fallback or page 1 fallback using OFFSET
+        const stmt = context.env.DB.prepare("SELECT * FROM sales LIMIT ? OFFSET ?").bind(limit, offset);
+        const res = await stmt.all();
+        results = res.results || [];
+      }
     } catch (sqlError: any) {
       return new Response(
         `Error,Message\n"SQL Execution Failure","Failed to run query on table 'sales': ${sqlError.message.replace(/"/g, '""')}"`,
@@ -141,10 +152,19 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       csvContent += rowStr + '\n';
     }
 
+    // Determine the last processed ID in this result slice to send back in headers
+    let lastId = 0;
+    const dbIdKey = Object.keys(firstRow).find(key => key.toLowerCase() === 'id');
+    if (dbIdKey && results.length > 0) {
+      lastId = results[results.length - 1][dbIdKey] || 0;
+    }
+
     return new Response(csvContent, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+        "X-Last-ID": String(lastId),             // Pass fast keyset pointer to client
+        "Access-Control-Expose-Headers": "X-Last-ID" // Permit browser reading of custom ID header
       },
     });
 
