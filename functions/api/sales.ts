@@ -80,11 +80,49 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       });
     }
 
-    // Get all column keys directly from the database result (excluding the database id column)
-    const dbColumns = Object.keys(results[0]).filter(key => {
-      const lowerKey = key.toLowerCase();
-      return lowerKey !== 'id' && lowerKey !== '_id';
-    });
+    // List of keys exactly as the React app expects from a standard CSV upload
+    const keys = [
+      'DIVISION',
+      'DEPARTMENT',
+      'CATEGORY',
+      'SUBCATEGORY',
+      'CLASS',
+      'BRAND',
+      'BRANCH NAME',
+      'BRANCH CODE',
+      'ITEM CODE',
+      'ITEM DESCRIPTION',
+      'TYPE',
+      'TYPE Plus',
+      '2024 CASH SALES',
+      '2024 CREDIT SALES',
+      '2024 TOTAL SALES',
+      '2025 CASH SALES',
+      '2025 CREDIT SALES',
+      '2025 TOTAL SALES'
+    ];
+
+    // Explicit dictionary map from standard uppercase React keys to your SQLite columns
+    const keysToSqlColumnsMap: Record<string, string> = {
+      'DIVISION': 'division',
+      'DEPARTMENT': 'department',
+      'CATEGORY': 'category',
+      'SUBCATEGORY': 'subcategory',
+      'CLASS': 'class',
+      'BRAND': 'brand',
+      'BRANCH NAME': 'branch_name',
+      'BRANCH CODE': 'branch_code', // Will map if present or output empty
+      'ITEM CODE': 'item_code',
+      'ITEM DESCRIPTION': 'item_description',
+      'TYPE': 'type',
+      'TYPE Plus': 'type_plus',
+      '2024 CASH SALES': 'sales_2024_cash',
+      '2024 CREDIT SALES': 'sales_2024_credit',
+      '2024 TOTAL SALES': 'sales_2024_total',
+      '2025 CASH SALES': 'sales_2025_cash',
+      '2025 CREDIT SALES': 'sales_2025_credit',
+      '2025 TOTAL SALES': 'sales_2025_total'
+    };
 
     // Helper to escape CSV values
     const escapeCsvValue = (val: any) => {
@@ -96,21 +134,20 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return str;
     };
 
-    // 2. Map SQLite column names back to standard CSV user-friendly headers
-    // (e.g. "_2024_cash_sales" -> "2024 CASH SALES", "branch_name" -> "BRANCH NAME")
-    const headerRow = dbColumns.map(key => {
-      return key.toUpperCase().replace(/_/g, ' ').trim();
-    }).join(',');
+    // 2. Generate CSV Header Row matching the exact React upload keys
+    const headerRow = keys.join(',');
     
-    // 3. Generate CSV rows using original SQLite values directly to prevent key mismatching!
+    // 3. Generate CSV rows mapping your dynamic SQLite column naming back to uppercase standard keys
     let csvContent = headerRow + '\n';
     const rowCount = results.length;
     for (let i = 0; i < rowCount; i++) {
       const row = results[i];
       let rowStr = '';
-      for (let j = 0; j < dbColumns.length; j++) {
-        const col = dbColumns[j];
-        rowStr += (j === 0 ? '' : ',') + escapeCsvValue(row[col]);
+      for (let j = 0; j < keys.length; j++) {
+        const key = keys[j];
+        const dbCol = keysToSqlColumnsMap[key];
+        const val = (dbCol && row[dbCol] !== undefined) ? row[dbCol] : '';
+        rowStr += (j === 0 ? '' : ',') + escapeCsvValue(val);
       }
       csvContent += rowStr + '\n';
     }
